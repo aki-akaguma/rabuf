@@ -1,0 +1,16 @@
+[package]
+name = "rabuf"
+version = "0.1.0"
+authors = ["aki <aki.akaguma@hotmail.com>"]
+edition = "2018"
+description = "randome access buffer for io"
+keywords = ["buffer", "io"]
+categories = ["memory-management", "data-structures"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/aki-akaguma/rabuf"
+
+[features]
+default = []
+
+[dependencies]

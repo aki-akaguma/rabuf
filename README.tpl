@@ -1,6 +1,6 @@
-# rabuf
+# {{crate}}
 
-
+{{readme}}
 
 # Changelogs
 
