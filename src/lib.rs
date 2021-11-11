@@ -1,6 +1,178 @@
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 
+/// Truncates or extends the underlying file.
+pub trait FileSetLen {
+    /// Truncates or extends the underlying file, updating the size of this file to become size.
+    fn set_len(&mut self, size: u64) -> Result<()>;
+}
+
+impl FileSetLen for BufFile {
+    /// Truncates or extends the underlying file, updating the size of this file to become size.
+    /// ref. [`std::io::File.set_len()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.set_len)
+    fn set_len(&mut self, size: u64) -> Result<()> {
+        if self.end >= size {
+            // shrink bunks
+            for i in 0..self.chunks.len() {
+                let chunk = &self.chunks[i];
+                if chunk.offset + chunk.data.len() as u64 >= size {
+                    // data end is over the new end
+                    // nothing todo
+                } else if chunk.offset >= size {
+                    // chunk start is over the new end
+                    self.map.remove(&chunk.offset);
+                    self.chunks[i].uses = 0;
+                    self.fetch_cache = None;
+                }
+            }
+        }
+        self.end = size;
+        if self.end < self.pos {
+            self.pos = self.end
+        }
+        self.file.set_len(size)?;
+        //
+        Ok(())
+    }
+}
+
+/// File syncronization include OS-internal metadata to disk.
+pub trait FileSync {
+    /// Attempts to sync all OS-internal metadata to disk.
+    fn sync_all(&mut self) -> Result<()>;
+    /// This function is similar to sync_all, except that it might not synchronize file metadata to the filesystem.
+    fn sync_data(&mut self) -> Result<()>;
+}
+
+impl FileSync for BufFile {
+    /// Flush buffer and call
+    /// [`std::io::File.sync_all()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_all)
+    fn sync_all(&mut self) -> Result<()> {
+        self.flush()?;
+        self.file.sync_all()
+    }
+    /// Flush buffer and call
+    /// [`std::io::File.sync_data()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_data)
+    fn sync_data(&mut self) -> Result<()> {
+        self.flush()?;
+        self.file.sync_data()
+    }
+}
+
+/// Read small bytes less than chunk size.
+pub trait SmallRead {
+    /// Read one byte with a fast routine.
+    fn read_one_byte(&mut self) -> Result<u8>;
+    /// Read small size bytes with a fast routine. The small size is less than chunk size.
+    fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()>;
+}
+
+impl SmallRead for BufFile {
+    /// Read one byte with a fast routine.
+    fn read_one_byte(&mut self) -> Result<u8> {
+        let curr = self.pos;
+        let one_byte = {
+            let chunk = self.fetch_chunk(curr)?;
+            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
+            if !data_slice.is_empty() {
+                data_slice[0]
+            } else {
+                let mut buf = [0u8; 1];
+                let _ = self.read_exact(&mut buf)?;
+                return Ok(buf[0]);
+            }
+        };
+        self.pos += 1;
+        Ok(one_byte)
+    }
+    /// Read small size bytes with a fast routine. The small size is less than chunk size.
+    fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()> {
+        debug_assert!(
+            buf.len() <= self.chunk_size,
+            "buf.len(): {} <= {}",
+            buf.len(),
+            self.chunk_size
+        );
+        let curr = self.pos;
+        let len = {
+            let chunk = self.fetch_chunk(curr)?;
+            let buf_len = buf.len();
+            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
+            if buf_len <= data_slice.len() {
+                buf.copy_from_slice(&data_slice[..buf_len]);
+                buf_len
+            } else {
+                self.read_exact(buf)?;
+                return Ok(());
+            }
+        };
+        self.pos += len as u64;
+        Ok(())
+    }
+}
+
+/// Write small bytes less than chunk size.
+pub trait SmallWrite {
+    /// Write small size bytes with a fast routine. The small size is less than chunk size.
+    fn write_all_small(&mut self, buf: &[u8]) -> Result<()>;
+    /// Write zero of length `size` with a fast routine.
+    fn write_zero(&mut self, size: u32) -> Result<()>;
+}
+
+impl SmallWrite for BufFile {
+    /// Write small size bytes with a fast routine. The small size is less than chunk size.
+    fn write_all_small(&mut self, buf: &[u8]) -> Result<()> {
+        debug_assert!(
+            buf.len() <= self.chunk_size,
+            "buf.len(): {} <= {}",
+            buf.len(),
+            self.chunk_size
+        );
+        let curr = self.pos;
+        let len = {
+            let chunk = self.fetch_chunk(curr)?;
+            let buf_len = buf.len();
+            chunk.dirty = true;
+            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
+            if buf_len <= data_slice.len() {
+                let dest = &mut data_slice[..buf_len];
+                dest.copy_from_slice(buf);
+                buf_len
+            } else {
+                return self.write_all(buf);
+            }
+        };
+        self.pos += len as u64;
+        if self.end < self.pos {
+            self.end = self.pos;
+        }
+        Ok(())
+    }
+    /// Write zero of length `size` with a fast routine.
+    fn write_zero(&mut self, size: u32) -> Result<()> {
+        let size = size as usize;
+        let curr = self.pos;
+        let len = {
+            let chunk = self.fetch_chunk(curr)?;
+            chunk.dirty = true;
+            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
+            if size <= data_slice.len() {
+                let dest = &mut data_slice[..size];
+                dest.fill(0u8);
+                size
+            } else {
+                let buf = vec![0u8; size];
+                return self.write_all(&buf);
+            }
+        };
+        self.pos += len as u64;
+        if self.end < self.pos {
+            self.end = self.pos;
+        }
+        Ok(())
+    }
+}
+
 /// Chunk size MUST be a power of 2.
 const CHUNK_SIZE: u32 = 1024 * 4;
 const DEFAULT_NUM_CHUNKS: u16 = 16;
@@ -184,6 +356,7 @@ pub fn roundup_powerof2(mut v: u32) -> u32 {
     v
 }
 
+// public implements
 impl BufFile {
     /// Creates a new BufFile.
     pub fn new(file: File) -> Result<BufFile> {
@@ -217,20 +390,8 @@ impl BufFile {
             stats_max_uses: 0,
         })
     }
-    /// Flush buffer and call `std::io::File.sync_all()`.
-    /// ref. [`std::io::File.sync_all()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_all)
-    pub fn sync_all(&mut self) -> Result<()> {
-        self.flush()?;
-        self.file.sync_all()
-    }
-    /// Flush buffer and call `std::io::File.sync_data()`.
-    /// ref. [`std::io::File.sync_data()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_data)
-    pub fn sync_data(&mut self) -> Result<()> {
-        self.flush()?;
-        self.file.sync_data()
-    }
-    /// Flush buffer and clear buffer chunks.
-    pub fn clear_buf(&mut self) -> Result<()> {
+    /// Flush and clear all buffer chunks.
+    pub fn clear(&mut self) -> Result<()> {
         self.flush()?;
         self.fetch_cache = None;
         self.chunks.clear();
@@ -250,123 +411,6 @@ impl BufFile {
             self.stats_max_uses as i64,
         ));
         vec
-    }
-    /// Truncates or extends the underlying file, updating the size of this file to become size.
-    /// ref. [`std::io::File.set_len()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.set_len)
-    pub fn set_len(&mut self, size: u64) -> Result<()> {
-        if self.end >= size {
-            // shrink bunks
-            for i in 0..self.chunks.len() {
-                let chunk = &self.chunks[i];
-                if chunk.offset + chunk.data.len() as u64 >= size {
-                    // data end is over the new end
-                    // nothing todo
-                } else if chunk.offset >= size {
-                    // chunk start is over the new end
-                    self.map.remove(&chunk.offset);
-                    self.chunks[i].uses = 0;
-                    self.fetch_cache = None;
-                }
-            }
-        }
-        self.end = size;
-        if self.end < self.pos {
-            self.pos = self.end
-        }
-        self.file.set_len(size)?;
-        //
-        Ok(())
-    }
-    /// Read one byte with a fast routine.
-    pub fn read_one_byte(&mut self) -> Result<u8> {
-        let curr = self.pos;
-        let one_byte = {
-            let chunk = self.fetch_chunk(curr)?;
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if !data_slice.is_empty() {
-                data_slice[0]
-            } else {
-                let mut buf = [0u8; 1];
-                let _ = self.read_exact(&mut buf)?;
-                return Ok(buf[0]);
-            }
-        };
-        self.pos += 1;
-        Ok(one_byte)
-    }
-    /// Read small size bytes with a fast routine. The small size is less than chunk size.
-    pub fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()> {
-        debug_assert!(
-            buf.len() <= self.chunk_size,
-            "buf.len(): {} <= {}",
-            buf.len(),
-            self.chunk_size
-        );
-        let curr = self.pos;
-        let len = {
-            let chunk = self.fetch_chunk(curr)?;
-            let buf_len = buf.len();
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if buf_len <= data_slice.len() {
-                buf.copy_from_slice(&data_slice[..buf_len]);
-                buf_len
-            } else {
-                self.read_exact(buf)?;
-                return Ok(());
-            }
-        };
-        self.pos += len as u64;
-        Ok(())
-    }
-    /// Write small size bytes with a fast routine. The small size is less than chunk size.
-    pub fn write_all_small(&mut self, buf: &[u8]) -> Result<()> {
-        debug_assert!(
-            buf.len() <= self.chunk_size,
-            "buf.len(): {} <= {}",
-            buf.len(),
-            self.chunk_size
-        );
-        let curr = self.pos;
-        let len = {
-            let chunk = self.fetch_chunk(curr)?;
-            let buf_len = buf.len();
-            chunk.dirty = true;
-            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
-            if buf_len <= data_slice.len() {
-                let dest = &mut data_slice[..buf_len];
-                dest.copy_from_slice(buf);
-                buf_len
-            } else {
-                return self.write_all(buf);
-            }
-        };
-        self.pos += len as u64;
-        if self.end < self.pos {
-            self.end = self.pos;
-        }
-        Ok(())
-    }
-    /// Write zero of length `size` with a fast routine.
-    pub fn write_zero(&mut self, size: usize) -> Result<()> {
-        let curr = self.pos;
-        let len = {
-            let chunk = self.fetch_chunk(curr)?;
-            chunk.dirty = true;
-            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
-            if size <= data_slice.len() {
-                let dest = &mut data_slice[..size];
-                dest.fill(0u8);
-                size
-            } else {
-                let buf = vec![0u8; size];
-                return self.write_all(&buf);
-            }
-        };
-        self.pos += len as u64;
-        if self.end < self.pos {
-            self.end = self.pos;
-        }
-        Ok(())
     }
 }
 
