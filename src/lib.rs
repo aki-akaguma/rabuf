@@ -1,5 +1,65 @@
+/*!
+The Buffer for random access file.
+
+When you read and write a file,
+this read and write in `Chunk` units and reduce IO operation.
+
+# Examples
+
+## Write, Seek, Read
+
+```rust
+use rabuf::BufFile;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+std::fs::create_dir_all("target/tmp").unwrap();
+
+let path = "target/tmp/doc_test_1";
+let bw = b"ABCEDFG\nhijklmn\n";
+
+let f = File::create(path).unwrap();
+let mut bf = BufFile::new(f).unwrap();
+bf.write_all(bw).unwrap();
+
+bf.seek(SeekFrom::Start(0)).unwrap();
+
+let mut br = vec![0u8; bw.len()];
+bf.read_exact(&mut br).unwrap();
+assert_eq!(&br, bw);
+```
+
+## Write, Close, Open, Read
+
+```rust
+use rabuf::BufFile;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+std::fs::create_dir_all("target/tmp").unwrap();
+let path = "target/tmp/doc_test_2";
+
+let bw = b"abcdefg\nHIJKLMN\n";
+{
+    let f = File::create(path).unwrap();
+    let mut bf = BufFile::new(f).unwrap();
+    bf.write_all(bw).unwrap();
+}
+{
+    let f = File::open(path).unwrap();
+    let mut bf = BufFile::new(f).unwrap();
+    let mut br = vec![0u8; bw.len()];
+    bf.read_exact(&mut br).unwrap();
+    assert_eq!(&br, bw);
+}
+```
+*/
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
+//use std::io::{Error, ErrorKind};
+
+/// Buffered File for ramdom access.
+pub type BufFile = RaBuf<File>;
 
 /// Truncates or extends the underlying file.
 pub trait FileSetLen {
@@ -33,6 +93,44 @@ impl FileSetLen for BufFile {
         self.file.set_len(size)?;
         //
         Ok(())
+    }
+}
+
+impl Seek for BufFile {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
+        let new_pos = match pos {
+            SeekFrom::Start(x) => x,
+            SeekFrom::End(x) => {
+                if x < 0 {
+                    self.end - (-x) as u64
+                } else {
+                    // weren't automatically extended beyond the end.
+                    self.end - x as u64
+                }
+            }
+            SeekFrom::Current(x) => {
+                if x < 0 {
+                    self.pos - (-x) as u64
+                } else {
+                    self.pos + x as u64
+                }
+            }
+        };
+        if new_pos > self.end {
+            // makes a sparse file.
+            self.set_len(new_pos)?;
+            /*
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!(
+                    "You tried to seek over the end of the file: {} < {}",
+                    self.end, new_pos
+                ),
+            ));
+            */
+        }
+        self.pos = new_pos;
+        Ok(new_pos)
     }
 }
 
@@ -191,7 +289,12 @@ struct Chunk {
 }
 
 impl Chunk {
-    fn new(offset: u64, end_pos: u64, chunk_size: usize, file: &mut File) -> Result<Chunk> {
+    fn new<U: Seek + Read>(
+        offset: u64,
+        end_pos: u64,
+        chunk_size: usize,
+        file: &mut U,
+    ) -> Result<Chunk> {
         file.seek(SeekFrom::Start(offset))?;
         let mut data = vec![0u8; chunk_size];
         if offset != end_pos {
@@ -214,7 +317,12 @@ impl Chunk {
         })
     }
     //
-    fn read_inplace(&mut self, offset: u64, end_pos: u64, file: &mut File) -> Result<()> {
+    fn read_inplace<U: Seek + Read + Write>(
+        &mut self,
+        offset: u64,
+        end_pos: u64,
+        file: &mut U,
+    ) -> Result<()> {
         let chunk_size = self.data.len();
         //
         file.seek(SeekFrom::Start(offset))?;
@@ -240,7 +348,7 @@ impl Chunk {
         Ok(())
     }
     //
-    fn write(&mut self, end_pos: u64, file: &mut File) -> Result<()> {
+    fn write<U: Seek + Read + Write>(&mut self, end_pos: u64, file: &mut U) -> Result<()> {
         if !self.dirty {
             return Ok(());
         }
@@ -308,9 +416,9 @@ impl OffsetIndex {
     }
 }
 
-/// Buffer for a random access file.
+/// Generic random access buffer.
 #[derive(Debug)]
-pub struct BufFile {
+pub struct RaBuf<T: Seek + Read + Write> {
     /// The maximum number of chunk
     max_num_chunks: usize,
     /// Chunk buffer size in bytes.
@@ -322,7 +430,7 @@ pub struct BufFile {
     /// Used to quickly map a file index to an array index (to index self.dat)
     map: OffsetIndex,
     /// The file to be written to and read from
-    file: File,
+    file: T,
     /// The current position of the file.
     pos: u64,
     /// The file offset that is the end of the file.
@@ -357,8 +465,9 @@ pub fn roundup_powerof2(mut v: u32) -> u32 {
 }
 
 // public implements
-impl BufFile {
+impl<T: Seek + Read + Write> RaBuf<T> {
     /// Creates a new BufFile.
+    /// number of chunk: 16, chunk size: 4096
     pub fn new(file: File) -> Result<BufFile> {
         Self::with_capacity(file, DEFAULT_NUM_CHUNKS, CHUNK_SIZE)
     }
@@ -414,7 +523,7 @@ impl BufFile {
     }
 }
 
-impl BufFile {
+impl<T: Seek + Read + Write> RaBuf<T> {
     #[inline]
     fn touch(&mut self, chunk_idx: usize) {
         #[cfg(not(feature = "buf_lru"))]
@@ -509,7 +618,7 @@ impl BufFile {
     }
 }
 
-impl Read for BufFile {
+impl<T: Seek + Read + Write> Read for RaBuf<T> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let curr = self.pos;
         let len = {
@@ -528,7 +637,7 @@ impl Read for BufFile {
     }
 }
 
-impl Write for BufFile {
+impl<T: Seek + Read + Write> Write for RaBuf<T> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let curr = self.pos;
         let len = {
@@ -551,7 +660,8 @@ impl Write for BufFile {
     }
 }
 
-impl Seek for BufFile {
+/*
+impl<T: Seek + Read + Write> Seek for RaBuf<T> {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         let new_pos = match pos {
             SeekFrom::Start(x) => x,
@@ -573,14 +683,22 @@ impl Seek for BufFile {
         };
         if new_pos > self.end {
             // makes a sparse file.
-            self.set_len(new_pos)?;
+            //self.set_len(new_pos)?;
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!(
+                    "You tried to seek over the end of the file: {} < {}",
+                    self.end, new_pos
+                ),
+            ));
         }
         self.pos = new_pos;
         Ok(new_pos)
     }
 }
+*/
 
-impl Drop for BufFile {
+impl<T: Seek + Read + Write> Drop for RaBuf<T> {
     /// Write all of the chunks to disk before closing the file.
     fn drop(&mut self) {
         let _ = self.flush();
