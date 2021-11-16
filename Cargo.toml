@@ -1,6 +1,6 @@
 [package]
 name = "rabuf"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["aki <aki.akaguma@hotmail.com>"]
 edition = "2018"
 description = "randome access buffer for io"
@@ -12,5 +12,8 @@ repository = "https://github.com/aki-akaguma/rabuf"
 
 [features]
 default = []
+
+buf_lru = []
+buf_stats = []
 
 [dependencies]

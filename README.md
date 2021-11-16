@@ -1,10 +1,63 @@
 # rabuf
 
+The Buffer for random access file.
 
+When you read and write a file,
+this read and write in `Chunk` units and reduce IO operation.
+
+## Examples
+
+### Write, Seek, Read
+
+```rust
+use rabuf::BufFile;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+std::fs::create_dir_all("target/tmp").unwrap();
+
+let path = "target/tmp/doc_test_1";
+let bw = b"ABCEDFG\nhijklmn\n";
+
+let f = File::create(path).unwrap();
+let mut bf = BufFile::new(f).unwrap();
+bf.write_all(bw).unwrap();
+
+bf.seek(SeekFrom::Start(0)).unwrap();
+
+let mut br = vec![0u8; bw.len()];
+bf.read_exact(&mut br).unwrap();
+assert_eq!(&br, bw);
+```
+
+### Write, Close, Open, Read
+
+```rust
+use rabuf::BufFile;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+std::fs::create_dir_all("target/tmp").unwrap();
+let path = "target/tmp/doc_test_2";
+
+let bw = b"abcdefg\nHIJKLMN\n";
+{
+    let f = File::create(path).unwrap();
+    let mut bf = BufFile::new(f).unwrap();
+    bf.write_all(bw).unwrap();
+}
+{
+    let f = File::open(path).unwrap();
+    let mut bf = BufFile::new(f).unwrap();
+    let mut br = vec![0u8; bw.len()];
+    bf.read_exact(&mut br).unwrap();
+    assert_eq!(&br, bw);
+}
+```
 
 # Changelogs
 
-[This crate's changelog here.](https://github.com/aki-akaguma/shamdb/blob/main/CHANGELOG.md)
+[This crate's changelog here.](https://github.com/aki-akaguma/rabuf/blob/main/CHANGELOG.md)
 
 # License
 
