@@ -81,8 +81,11 @@ impl FileSetLen for BufFile {
                 } else if chunk.offset >= size {
                     // chunk start is over the new end
                     self.map.remove(&chunk.offset);
-                    self.chunks[i].uses = 0;
                     self.fetch_cache = None;
+                    #[cfg(not(feature = "buf_overf_rem_all"))]
+                    {
+                        self.chunks[i].uses = 0;
+                    }
                 }
             }
         }
@@ -285,6 +288,7 @@ struct Chunk {
     /// dirty flag. we should write the chunk to the file.
     dirty: bool,
     /// uses counter. counts up if we read or write chunk.
+    #[cfg(not(feature = "buf_overf_rem_all"))]
     uses: u32,
 }
 
@@ -313,10 +317,12 @@ impl Chunk {
             data,
             offset,
             dirty: false,
+            #[cfg(not(feature = "buf_overf_rem_all"))]
             uses: 0,
         })
     }
     //
+    #[cfg(not(feature = "buf_overf_rem"))]
     fn read_inplace<U: Seek + Read + Write>(
         &mut self,
         offset: u64,
@@ -342,8 +348,8 @@ impl Chunk {
         }
         //
         self.dirty = false;
-        self.uses = 0;
         self.offset = offset;
+        self.uses = 0;
         //
         Ok(())
     }
@@ -505,6 +511,11 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         self.fetch_cache = None;
         self.chunks.clear();
         self.map.clear();
+        #[cfg(feature = "buf_lru")]
+        {
+            // clear LRU(: Least Reacently Used) counter
+            self.uses_cnt = 0;
+        }
         Ok(())
     }
     ///
@@ -525,15 +536,22 @@ impl<T: Seek + Read + Write> RaBuf<T> {
 
 impl<T: Seek + Read + Write> RaBuf<T> {
     #[inline]
-    fn touch(&mut self, chunk_idx: usize) {
-        #[cfg(not(feature = "buf_lru"))]
+    fn touch(&mut self, _chunk_idx: usize) {
+        #[cfg(feature = "buf_overf_rem")]
         {
-            self.chunks[chunk_idx].uses += 1;
+            // nothing todo
         }
-        #[cfg(feature = "buf_lru")]
+        #[cfg(not(feature = "buf_overf_rem"))]
         {
-            self.uses_cnt += 1;
-            self.chunks[chunk_idx].uses = self.uses_cnt;
+            #[cfg(not(feature = "buf_lru"))]
+            {
+                self.chunks[_chunk_idx].uses += 1;
+            }
+            #[cfg(feature = "buf_lru")]
+            {
+                self.uses_cnt += 1;
+                self.chunks[_chunk_idx].uses = self.uses_cnt;
+            }
         }
     }
     //
@@ -568,53 +586,105 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 Err(e) => Err(e),
             }
         } else {
-            // LFU: Least Frequently Used
-            let min_idx = {
-                // find the minimum uses counter.
-                let mut min_idx = 0;
-                let mut min_uses = self.chunks[min_idx].uses;
-                if min_uses != 0 {
-                    for i in 1..self.max_num_chunks {
-                        if self.chunks[i].uses < min_uses {
-                            min_idx = i;
-                            min_uses = self.chunks[min_idx].uses;
-                            if min_uses == 0 {
-                                break;
-                            }
-                        } else {
-                            #[cfg(feature = "buf_stats")]
-                            {
-                                if self.chunks[i].uses > self.stats_max_uses {
-                                    self.stats_max_uses = self.chunks[i].uses;
+            #[cfg(feature = "buf_overf_rem")]
+            {
+                self.remove_chunks()?;
+                self.add_chunk(offset)
+            }
+            #[cfg(not(feature = "buf_overf_rem"))]
+            {
+                // LFU: Least Frequently Used
+                let min_idx = {
+                    // find the minimum uses counter.
+                    let mut min_idx = 0;
+                    let mut min_uses = self.chunks[min_idx].uses;
+                    if min_uses != 0 {
+                        for i in 1..self.max_num_chunks {
+                            if self.chunks[i].uses < min_uses {
+                                min_idx = i;
+                                min_uses = self.chunks[min_idx].uses;
+                                if min_uses == 0 {
+                                    break;
+                                }
+                            } else {
+                                #[cfg(feature = "buf_stats")]
+                                {
+                                    if self.chunks[i].uses > self.stats_max_uses {
+                                        self.stats_max_uses = self.chunks[i].uses;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                #[cfg(feature = "buf_stats")]
-                {
-                    if min_uses > 0 && min_uses < self.stats_min_uses {
-                        self.stats_min_uses = min_uses;
+                    #[cfg(feature = "buf_stats")]
+                    {
+                        if min_uses > 0 && min_uses < self.stats_min_uses {
+                            self.stats_min_uses = min_uses;
+                        }
                     }
-                }
-                // clear all uses counter
-                self.chunks.iter_mut().for_each(|chunk| {
-                    chunk.uses = 0;
-                });
-                #[cfg(feature = "buf_lru")]
-                {
-                    // clear LRU(: Least Reacently Used) counter
-                    self.uses_cnt = 0;
-                }
-                min_idx
-            };
-            // Make a new chunk, write the old chunk to disk, replace old chunk
-            self.chunks[min_idx].write(self.end, &mut self.file)?;
-            self.map.remove(&self.chunks[min_idx].offset);
-            self.map.insert(offset, min_idx);
-            self.chunks[min_idx].read_inplace(offset, self.end, &mut self.file)?;
-            Ok(min_idx)
+                    // clear all uses counter
+                    self.chunks.iter_mut().for_each(|chunk| {
+                        chunk.uses = 0;
+                    });
+                    #[cfg(feature = "buf_lru")]
+                    {
+                        // clear LRU(: Least Reacently Used) counter
+                        self.uses_cnt = 0;
+                    }
+                    min_idx
+                };
+                // Make a new chunk, write the old chunk to disk, replace old chunk
+                self.chunks[min_idx].write(self.end, &mut self.file)?;
+                self.map.remove(&self.chunks[min_idx].offset);
+                self.map.insert(offset, min_idx);
+                self.chunks[min_idx].read_inplace(offset, self.end, &mut self.file)?;
+                Ok(min_idx)
+            }
         }
+    }
+    //
+    #[cfg(all(feature = "buf_overf_rem", feature = "buf_overf_rem_all"))]
+    fn remove_chunks(&mut self) -> Result<()> {
+        self.clear()?;
+        Ok(())
+    }
+    #[cfg(all(feature = "buf_overf_rem", feature = "buf_overf_rem_half"))]
+    fn remove_chunks(&mut self) -> Result<()> {
+        // the LFU/LRU half clear
+        let mut vec: Vec<(usize, u32)> = self
+            .chunks
+            .iter()
+            .enumerate()
+            .map(|(idx, chunk)| (idx, chunk.uses))
+            .collect();
+        vec.sort_by(|a, b| match b.1.cmp(&a.1) {
+            std::cmp::Ordering::Equal => b.0.cmp(&a.0),
+            std::cmp::Ordering::Less => std::cmp::Ordering::Less,
+            std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+        });
+        let half = vec.len() / 2;
+        let _rest = vec.split_off(half);
+        vec.sort_by(|a, b| a.0.cmp(&b.0));
+        while let Some((idx, _uses)) = vec.pop() {
+            let mut _chunk = self.chunks.remove(idx);
+            _chunk.write(self.end, &mut self.file)?;
+        }
+        self.map.clear();
+        // clear all uses counter
+        let mut vec2: Vec<(u64, usize)> = Vec::new();
+        self.chunks.iter_mut().enumerate().for_each(|(idx, chunk)| {
+            vec2.push((chunk.offset, idx));
+            chunk.uses = 0;
+        });
+        vec2.iter().for_each(|v| {
+            self.map.insert(v.0, v.1);
+        });
+        #[cfg(feature = "buf_lru")]
+        {
+            // clear LRU(: Least Reacently Used) counter
+            self.uses_cnt = 0;
+        }
+        Ok(())
     }
 }
 
@@ -653,8 +723,13 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
         Ok(len)
     }
     fn flush(&mut self) -> Result<()> {
+        /*
         for chunk in self.chunks.iter_mut() {
             chunk.write(self.end, &mut self.file)?;
+        }
+        */
+        for &(_, idx) in self.map.vec.iter() {
+            self.chunks[idx].write(self.end, &mut self.file)?;
         }
         Ok(())
     }
