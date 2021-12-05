@@ -11,13 +11,19 @@ readme = "README.md"
 repository = "https://github.com/aki-akaguma/rabuf"
 
 [features]
-default = ["buf_overf_rem_all"]
+default = ["buf_auto_buf_size", "buf_overf_rem_all", "buf_pin_zero"]
 
 buf_lru = []
 buf_stats = []
 
+buf_auto_buf_size = []
+
 buf_overf_rem_all = ["buf_overf_rem"]
 buf_overf_rem_half = ["buf_overf_rem", "buf_lru"]
 buf_overf_rem = []
+
+buf_pin_zero = []
+
+buf_idx_btreemap = []
 
 [dependencies]

@@ -57,6 +57,8 @@ let bw = b"abcdefg\nHIJKLMN\n";
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 //use std::io::{Error, ErrorKind};
+#[cfg(feature = "buf_idx_btreemap")]
+use std::collections::BTreeMap;
 
 /// Buffered File for ramdom access.
 pub type BufFile = RaBuf<File>;
@@ -274,9 +276,40 @@ impl SmallWrite for BufFile {
     }
 }
 
+/// Auto buffer size with per mille of the file size.
+#[cfg(feature = "buf_auto_buf_size")]
+#[derive(Debug)]
+struct AutoBufferSize(u16);
+
+#[cfg(feature = "buf_auto_buf_size")]
+impl AutoBufferSize {
+    pub fn with_per_mille(per_mille: u16) -> Self {
+        Self(per_mille)
+    }
+    fn buffer_size<T: Seek>(&self, file: &mut T) -> Result<usize> {
+        let per_mille = self.0;
+        if per_mille > 0 {
+            let file_size = file.seek(SeekFrom::End(0))?;
+            let val = (file_size / 1000) * per_mille as u64;
+            if val > 8 * 4 * 1024 {
+                Ok(val as usize)
+            } else {
+                Ok(8 * 4 * 1024)
+            }
+        } else {
+            Ok(8 * 4 * 1024)
+        }
+    }
+}
+
 /// Chunk size MUST be a power of 2.
 const CHUNK_SIZE: u32 = 1024 * 4;
+
+#[cfg(not(feature = "buf_auto_buf_size"))]
 const DEFAULT_NUM_CHUNKS: u16 = 16;
+
+#[cfg(feature = "buf_auto_buf_size")]
+const DEFAULT_PER_MILLE: u16 = 20;
 
 /// Chunk buffer for reading or writing.
 #[derive(Debug)]
@@ -386,39 +419,61 @@ impl Chunk {
 /// the value is the index of BufFile::data.
 #[derive(Debug)]
 struct OffsetIndex {
+    #[cfg(not(feature = "buf_idx_btreemap"))]
     vec: Vec<(u64, usize)>,
+    #[cfg(feature = "buf_idx_btreemap")]
+    btm: BTreeMap<u64, usize>,
 }
 impl OffsetIndex {
-    fn with_capacity(cap: usize) -> Self {
+    fn with_capacity(_cap: usize) -> Self {
         Self {
-            vec: Vec::with_capacity(cap),
+            #[cfg(not(feature = "buf_idx_btreemap"))]
+            vec: Vec::with_capacity(_cap),
+            #[cfg(feature = "buf_idx_btreemap")]
+            btm: BTreeMap::new(),
         }
     }
-    fn get(&mut self, offset: u64) -> Option<usize> {
-        if let Ok(x) = self.vec.binary_search_by(|a| a.0.cmp(&offset)) {
+    fn get(&mut self, offset: &u64) -> Option<usize> {
+        #[cfg(not(feature = "buf_idx_btreemap"))]
+        if let Ok(x) = self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Some(self.vec[x].1)
         } else {
             None
         }
+        #[cfg(feature = "buf_idx_btreemap")]
+        if let Some(x) = self.btm.get(offset) {
+            Some(*x)
+        } else {
+            None
+        }
     }
-    fn insert(&mut self, offset: u64, idx: usize) {
-        match self.vec.binary_search_by(|a| a.0.cmp(&offset)) {
+    fn insert(&mut self, offset: &u64, idx: usize) {
+        #[cfg(not(feature = "buf_idx_btreemap"))]
+        match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => {
                 self.vec[x].1 = idx;
             }
             Err(x) => {
-                self.vec.insert(x, (offset, idx));
+                self.vec.insert(x, (*offset, idx));
             }
         }
+        #[cfg(feature = "buf_idx_btreemap")]
+        let _ = self.btm.insert(*offset, idx);
     }
     fn remove(&mut self, offset: &u64) -> Option<usize> {
+        #[cfg(not(feature = "buf_idx_btreemap"))]
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => Some(self.vec.remove(x).1),
             Err(_x) => None,
         }
+        #[cfg(feature = "buf_idx_btreemap")]
+        self.btm.remove(offset)
     }
     fn clear(&mut self) {
+        #[cfg(not(feature = "buf_idx_btreemap"))]
         self.vec.clear();
+        #[cfg(feature = "buf_idx_btreemap")]
+        self.btm.clear();
     }
 }
 
@@ -453,6 +508,9 @@ pub struct RaBuf<T: Seek + Read + Write> {
     // a maximum uses counter
     #[cfg(feature = "buf_stats")]
     stats_max_uses: u32,
+    // a per mille for the file size.
+    #[cfg(feature = "buf_auto_buf_size")]
+    auto_buf_size: AutoBufferSize,
 }
 
 // ref.) http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
@@ -474,12 +532,19 @@ pub fn roundup_powerof2(mut v: u32) -> u32 {
 impl<T: Seek + Read + Write> RaBuf<T> {
     /// Creates a new BufFile.
     /// number of chunk: 16, chunk size: 4096
-    pub fn new(file: File) -> Result<BufFile> {
-        Self::with_capacity(file, DEFAULT_NUM_CHUNKS, CHUNK_SIZE)
+    pub fn new(file: T) -> Result<RaBuf<T>> {
+        #[cfg(not(feature = "buf_auto_buf_size"))]
+        {
+            Self::with_capacity(file, CHUNK_SIZE, DEFAULT_NUM_CHUNKS)
+        }
+        #[cfg(feature = "buf_auto_buf_size")]
+        {
+            Self::with_per_mille(file, CHUNK_SIZE, DEFAULT_PER_MILLE)
+        }
     }
     /// Creates a new BufFile with the specified number of chunks.
     /// chunk_size is MUST power of 2.
-    pub fn with_capacity(mut file: File, max_num_chunks: u16, chunk_size: u32) -> Result<BufFile> {
+    pub fn with_capacity(mut file: T, chunk_size: u32, max_num_chunks: u16) -> Result<RaBuf<T>> {
         debug_assert!(chunk_size == roundup_powerof2(chunk_size));
         let max_num_chunks = max_num_chunks as usize;
         let chunk_mask = !(chunk_size as u64 - 1);
@@ -487,7 +552,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let end = file.seek(SeekFrom::End(0))?;
         file.seek(SeekFrom::Start(0))?;
         //
-        Ok(BufFile {
+        Ok(Self {
             max_num_chunks,
             chunk_size,
             chunk_mask,
@@ -503,14 +568,63 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             stats_min_uses: 0,
             #[cfg(feature = "buf_stats")]
             stats_max_uses: 0,
+            #[cfg(feature = "buf_auto_buf_size")]
+            auto_buf_size: AutoBufferSize::with_per_mille(0),
+        })
+    }
+    /// Create a new BufFile with auto buffer size per mille of file size.
+    /// chunk_size is MUST power of 2.
+    #[cfg(feature = "buf_auto_buf_size")]
+    pub fn with_per_mille(mut file: T, chunk_size: u32, per_mille: u16) -> Result<RaBuf<T>> {
+        debug_assert!(chunk_size == roundup_powerof2(chunk_size));
+        let chunk_mask = !(chunk_size as u64 - 1);
+        let chunk_size = chunk_size as usize;
+        let auto_buf_size = AutoBufferSize::with_per_mille(per_mille);
+        let max_num_chunks = auto_buf_size.buffer_size(&mut file)? / chunk_size;
+        let end = file.seek(SeekFrom::End(0))?;
+        file.seek(SeekFrom::Start(0))?;
+        //
+        Ok(Self {
+            max_num_chunks,
+            chunk_size,
+            chunk_mask,
+            chunks: Vec::with_capacity(max_num_chunks),
+            map: OffsetIndex::with_capacity(max_num_chunks),
+            file,
+            pos: 0,
+            end,
+            fetch_cache: None,
+            #[cfg(feature = "buf_lru")]
+            uses_cnt: 0,
+            #[cfg(feature = "buf_stats")]
+            stats_min_uses: 0,
+            #[cfg(feature = "buf_stats")]
+            stats_max_uses: 0,
+            auto_buf_size,
         })
     }
     /// Flush and clear all buffer chunks.
     pub fn clear(&mut self) -> Result<()> {
         self.flush()?;
         self.fetch_cache = None;
-        self.chunks.clear();
-        self.map.clear();
+        #[cfg(not(feature = "buf_pin_zero"))]
+        {
+            self.chunks.clear();
+            self.map.clear();
+        }
+        #[cfg(feature = "buf_pin_zero")]
+        {
+            if let Some(idx) = self.map.get(&0) {
+                let chunk_zero = self.chunks.remove(idx);
+                self.chunks.clear();
+                self.map.clear();
+                self.chunks.push(chunk_zero);
+                self.map.insert(&0, 0);
+            } else {
+                self.chunks.clear();
+                self.map.clear();
+            }
+        }
         #[cfg(feature = "buf_lru")]
         {
             // clear LRU(: Least Reacently Used) counter
@@ -535,6 +649,14 @@ impl<T: Seek + Read + Write> RaBuf<T> {
 }
 
 impl<T: Seek + Read + Write> RaBuf<T> {
+    #[cfg(feature = "buf_auto_buf_size")]
+    fn setup_auto_buf_size(&mut self) -> Result<()> {
+        let val = self.auto_buf_size.buffer_size(&mut self.file)? / self.chunk_size;
+        if val > self.chunks.len() {
+            self.max_num_chunks = val;
+        }
+        Ok(())
+    }
     #[inline]
     fn touch(&mut self, _chunk_idx: usize) {
         #[cfg(feature = "buf_overf_rem")]
@@ -563,7 +685,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 return Ok(&mut self.chunks[idx]);
             }
         }
-        let idx = if let Some(x) = self.map.get(offset) {
+        let idx = if let Some(x) = self.map.get(&offset) {
             x
         } else {
             self.add_chunk(offset)?
@@ -579,7 +701,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             let new_idx = self.chunks.len();
             match Chunk::new(offset, self.end, self.chunk_size, &mut self.file) {
                 Ok(x) => {
-                    self.map.insert(offset, new_idx);
+                    self.map.insert(&offset, new_idx);
                     self.chunks.push(x);
                     Ok(new_idx)
                 }
@@ -638,6 +760,8 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 self.map.remove(&self.chunks[min_idx].offset);
                 self.map.insert(offset, min_idx);
                 self.chunks[min_idx].read_inplace(offset, self.end, &mut self.file)?;
+                #[cfg(feature = "buf_auto_buf_size")]
+                self.setup_auto_buf_size()?;
                 Ok(min_idx)
             }
         }
@@ -646,6 +770,8 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     #[cfg(all(feature = "buf_overf_rem", feature = "buf_overf_rem_all"))]
     fn remove_chunks(&mut self) -> Result<()> {
         self.clear()?;
+        #[cfg(feature = "buf_auto_buf_size")]
+        self.setup_auto_buf_size()?;
         Ok(())
     }
     #[cfg(all(feature = "buf_overf_rem", feature = "buf_overf_rem_half"))]
@@ -679,6 +805,8 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         vec2.iter().for_each(|v| {
             self.map.insert(v.0, v.1);
         });
+        #[cfg(feature = "buf_auto_buf_size")]
+        self.setup_auto_buf_size()?;
         #[cfg(feature = "buf_lru")]
         {
             // clear LRU(: Least Reacently Used) counter
@@ -694,12 +822,15 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
         let len = {
             let chunk = self.fetch_chunk(curr)?;
             let buf_len = buf.len();
-            let mut data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if buf_len <= data_slice.len() {
+            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
+            let data_slice_len = data_slice.len();
+            if buf_len <= data_slice_len {
                 buf.copy_from_slice(&data_slice[..buf_len]);
                 buf_len
             } else {
-                data_slice.read(buf)?
+                let nallow_buf = &mut buf[..data_slice_len];
+                nallow_buf.copy_from_slice(data_slice);
+                data_slice_len
             }
         };
         self.pos += len as u64;
@@ -728,7 +859,12 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
             chunk.write(self.end, &mut self.file)?;
         }
         */
+        #[cfg(not(feature = "buf_idx_btreemap"))]
         for &(_, idx) in self.map.vec.iter() {
+            self.chunks[idx].write(self.end, &mut self.file)?;
+        }
+        #[cfg(feature = "buf_idx_btreemap")]
+        for (_, &idx) in self.map.btm.iter() {
             self.chunks[idx].write(self.end, &mut self.file)?;
         }
         Ok(())
@@ -790,7 +926,12 @@ mod debug {
         #[cfg(target_pointer_width = "64")]
         {
             #[cfg(not(feature = "buf_stats"))]
-            assert_eq!(std::mem::size_of::<BufFile>(), 120);
+            {
+                #[cfg(not(feature = "buf_overf_rem_half"))]
+                assert_eq!(std::mem::size_of::<BufFile>(), 120);
+                #[cfg(feature = "buf_overf_rem_half")]
+                assert_eq!(std::mem::size_of::<BufFile>(), 128);
+            }
             #[cfg(feature = "buf_stats")]
             assert_eq!(std::mem::size_of::<BufFile>(), 128);
             //
@@ -804,7 +945,17 @@ mod debug {
             #[cfg(not(any(feature = "buf_stats", feature = "buf_lru")))]
             {
                 #[cfg(not(target_arch = "arm"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 76);
+                {
+                    #[cfg(not(any(
+                        feature = "buf_overf_rem_all",
+                        feature = "buf_overf_rem_half"
+                    )))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                    #[cfg(feature = "buf_overf_rem_half")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 76);
+                    #[cfg(feature = "buf_overf_rem_all")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                }
                 #[cfg(target_arch = "arm")]
                 assert_eq!(std::mem::size_of::<BufFile>(), 88);
             }
@@ -825,15 +976,35 @@ mod debug {
             #[cfg(all(not(feature = "buf_stats"), feature = "buf_lru"))]
             {
                 #[cfg(not(target_arch = "arm"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                {
+                    #[cfg(not(feature = "buf_overf_rem_half"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                    #[cfg(feature = "buf_overf_rem_half")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 84);
+                }
                 #[cfg(target_arch = "arm")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 88);
+                {
+                    #[cfg(not(feature = "buf_overf_rem_half"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                    #[cfg(feature = "buf_overf_rem_half")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
+                }
             }
             //
             #[cfg(not(target_arch = "arm"))]
-            assert_eq!(std::mem::size_of::<Chunk>(), 28);
+            {
+                #[cfg(not(feature = "buf_overf_rem_all"))]
+                assert_eq!(std::mem::size_of::<Chunk>(), 28);
+                #[cfg(feature = "buf_overf_rem_all")]
+                assert_eq!(std::mem::size_of::<Chunk>(), 24);
+            }
             #[cfg(target_arch = "arm")]
-            assert_eq!(std::mem::size_of::<Chunk>(), 32);
+            {
+                #[cfg(not(feature = "buf_overf_rem_all"))]
+                assert_eq!(std::mem::size_of::<Chunk>(), 32);
+                #[cfg(feature = "buf_overf_rem_all")]
+                assert_eq!(std::mem::size_of::<Chunk>(), 24);
+            }
             //
             #[cfg(not(target_arch = "arm"))]
             assert_eq!(std::mem::size_of::<(u64, usize)>(), 12);

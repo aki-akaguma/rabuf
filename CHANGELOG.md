@@ -2,6 +2,10 @@ TBD
 ===
 Unreleased changes. Release notes have not yet been written.
 
+* adds `buf_pin_zero` to features
+* fix bugs: create methods of `struct RaBuf<T>`.
+* adds `buf_auto_buf_size` to features
+
 0.1.3 (2021-11-26)
 =====
 
