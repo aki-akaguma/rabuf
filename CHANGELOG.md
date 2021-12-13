@@ -2,6 +2,11 @@ TBD
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.5 (2021-12-13)
+=====
+
+* adds `read_fill_buffer()`.
+
 0.1.4 (2021-12-05)
 =====
 

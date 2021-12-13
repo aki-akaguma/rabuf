@@ -60,8 +60,29 @@ use std::io::{Read, Result, Seek, SeekFrom, Write};
 #[cfg(feature = "buf_idx_btreemap")]
 use std::collections::BTreeMap;
 
+pub mod maybe;
+pub use maybe::MaybeSlice;
+
 /// Buffered File for ramdom access.
 pub type BufFile = RaBuf<File>;
+
+impl BufFile {
+    pub fn read_fill_buffer(&mut self) -> Result<()> {
+        let end_pos = self.seek(SeekFrom::End(0))?;
+        let chunk_size = self.chunk_size as u64;
+        let mut curr = 0;
+        while curr < end_pos {
+            let _ = self.fetch_chunk(curr)?;
+            if self.chunks.len() < self.max_num_chunks {
+                curr += chunk_size;
+            } else {
+                break;
+            }
+        }
+        //
+        Ok(())
+    }
+}
 
 /// Truncates or extends the underlying file.
 pub trait FileSetLen {
@@ -102,6 +123,7 @@ impl FileSetLen for BufFile {
 }
 
 impl Seek for BufFile {
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         let new_pos = match pos {
             SeekFrom::Start(x) => x,
@@ -124,15 +146,6 @@ impl Seek for BufFile {
         if new_pos > self.end {
             // makes a sparse file.
             self.set_len(new_pos)?;
-            /*
-            return Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                format!(
-                    "You tried to seek over the end of the file: {} < {}",
-                    self.end, new_pos
-                ),
-            ));
-            */
         }
         self.pos = new_pos;
         Ok(new_pos)
@@ -150,12 +163,14 @@ pub trait FileSync {
 impl FileSync for BufFile {
     /// Flush buffer and call
     /// [`std::io::File.sync_all()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_all)
+    #[inline]
     fn sync_all(&mut self) -> Result<()> {
         self.flush()?;
         self.file.sync_all()
     }
     /// Flush buffer and call
     /// [`std::io::File.sync_data()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.sync_data)
+    #[inline]
     fn sync_data(&mut self) -> Result<()> {
         self.flush()?;
         self.file.sync_data()
@@ -166,12 +181,17 @@ impl FileSync for BufFile {
 pub trait SmallRead {
     /// Read one byte with a fast routine.
     fn read_one_byte(&mut self) -> Result<u8>;
+    /// Read maximum 8 bytes with a fast routine and return the little endian u64.
+    fn read_max_8_bytes(&mut self, size: usize) -> Result<u64>;
     /// Read small size bytes with a fast routine. The small size is less than chunk size.
     fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()>;
+    /// Read small size bytes and return MaybeSlice.
+    fn read_exact_maybeslice(&mut self, size: usize) -> Result<MaybeSlice<'_>>;
 }
 
 impl SmallRead for BufFile {
     /// Read one byte with a fast routine.
+    #[inline]
     fn read_one_byte(&mut self) -> Result<u8> {
         let curr = self.pos;
         let one_byte = {
@@ -188,7 +208,34 @@ impl SmallRead for BufFile {
         self.pos += 1;
         Ok(one_byte)
     }
+    /// Read maximum 8 bytes with a fast routine and return little endian u64.
+    #[inline]
+    fn read_max_8_bytes(&mut self, size: usize) -> Result<u64> {
+        debug_assert!(size <= 8, "size: {} <= 8", size,);
+        let curr = self.pos;
+        let max_8_bytes = {
+            let chunk = self.fetch_chunk(curr)?;
+            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
+            if !data_slice.is_empty() && data_slice.len() >= 8 {
+                let mut val = 0u64;
+                let mut i = size as i32 - 1;
+                while i >= 0 {
+                    let byte = unsafe { *data_slice.get_unchecked(i as usize) };
+                    val = val << 8 | byte as u64;
+                    i -= 1;
+                }
+                self.pos += size as u64;
+                val
+            } else {
+                let mut buf = [0u8; 8];
+                let _ = self.read_exact(&mut buf[..size])?;
+                u64::from_le_bytes(buf)
+            }
+        };
+        Ok(max_8_bytes)
+    }
     /// Read small size bytes with a fast routine. The small size is less than chunk size.
+    #[inline]
     fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()> {
         debug_assert!(
             buf.len() <= self.chunk_size,
@@ -212,6 +259,29 @@ impl SmallRead for BufFile {
         self.pos += len as u64;
         Ok(())
     }
+    /// Read small size bytes and return MaybeSlice.
+    #[inline]
+    fn read_exact_maybeslice(&mut self, size: usize) -> Result<MaybeSlice<'_>> {
+        let (idx, st, data_sz) = {
+            let curr = self.pos;
+            let _ = self.fetch_chunk(curr)?;
+            if let Some((offset, idx)) = self.fetch_cache {
+                let st = (curr - offset) as usize;
+                (idx, st, self.chunks[idx].data.len() - st)
+            } else {
+                (0, 0, 0)
+            }
+        };
+        if size <= data_sz {
+            let data_slice = &self.chunks[idx].data[st..];
+            self.pos += size as u64;
+            Ok(MaybeSlice::Slice(&data_slice[..size]))
+        } else {
+            let mut buf = vec![0u8; size];
+            self.read_exact(&mut buf)?;
+            Ok(MaybeSlice::Buffer(buf))
+        }
+    }
 }
 
 /// Write small bytes less than chunk size.
@@ -224,6 +294,7 @@ pub trait SmallWrite {
 
 impl SmallWrite for BufFile {
     /// Write small size bytes with a fast routine. The small size is less than chunk size.
+    #[inline]
     fn write_all_small(&mut self, buf: &[u8]) -> Result<()> {
         debug_assert!(
             buf.len() <= self.chunk_size,
@@ -252,6 +323,7 @@ impl SmallWrite for BufFile {
         Ok(())
     }
     /// Write zero of length `size` with a fast routine.
+    #[inline]
     fn write_zero(&mut self, size: u32) -> Result<()> {
         let size = size as usize;
         let curr = self.pos;
@@ -286,11 +358,16 @@ impl AutoBufferSize {
     pub fn with_per_mille(per_mille: u16) -> Self {
         Self(per_mille)
     }
+    #[inline]
     fn buffer_size<T: Seek>(&self, file: &mut T) -> Result<usize> {
         let per_mille = self.0;
         if per_mille > 0 {
             let file_size = file.seek(SeekFrom::End(0))?;
-            let val = (file_size / 1000) * per_mille as u64;
+            let val = if per_mille >= 1000 {
+                file_size
+            } else {
+                (file_size / 1000) * per_mille as u64
+            };
             if val > 8 * 4 * 1024 {
                 Ok(val as usize)
             } else {
@@ -433,10 +510,12 @@ impl OffsetIndex {
             btm: BTreeMap::new(),
         }
     }
+    #[inline]
     fn get(&mut self, offset: &u64) -> Option<usize> {
         #[cfg(not(feature = "buf_idx_btreemap"))]
         if let Ok(x) = self.vec.binary_search_by(|a| a.0.cmp(offset)) {
-            Some(self.vec[x].1)
+            //Some(self.vec[x].1)
+            Some(unsafe { self.vec.get_unchecked(x).1 })
         } else {
             None
         }
@@ -447,6 +526,7 @@ impl OffsetIndex {
             None
         }
     }
+    #[inline]
     fn insert(&mut self, offset: &u64, idx: usize) {
         #[cfg(not(feature = "buf_idx_btreemap"))]
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
@@ -469,6 +549,7 @@ impl OffsetIndex {
         #[cfg(feature = "buf_idx_btreemap")]
         self.btm.remove(offset)
     }
+    #[inline]
     fn clear(&mut self) {
         #[cfg(not(feature = "buf_idx_btreemap"))]
         self.vec.clear();
@@ -546,6 +627,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     /// chunk_size is MUST power of 2.
     pub fn with_capacity(mut file: T, chunk_size: u32, max_num_chunks: u16) -> Result<RaBuf<T>> {
         debug_assert!(chunk_size == roundup_powerof2(chunk_size));
+        debug_assert!(max_num_chunks > 0);
         let max_num_chunks = max_num_chunks as usize;
         let chunk_mask = !(chunk_size as u64 - 1);
         let chunk_size = chunk_size as usize;
@@ -580,7 +662,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let chunk_mask = !(chunk_size as u64 - 1);
         let chunk_size = chunk_size as usize;
         let auto_buf_size = AutoBufferSize::with_per_mille(per_mille);
-        let max_num_chunks = auto_buf_size.buffer_size(&mut file)? / chunk_size;
+        let max_num_chunks = (auto_buf_size.buffer_size(&mut file)? / chunk_size) + 1;
         let end = file.seek(SeekFrom::End(0))?;
         file.seek(SeekFrom::Start(0))?;
         //
@@ -604,6 +686,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         })
     }
     /// Flush and clear all buffer chunks.
+    #[inline]
     pub fn clear(&mut self) -> Result<()> {
         self.flush()?;
         self.fetch_cache = None;
@@ -650,8 +733,9 @@ impl<T: Seek + Read + Write> RaBuf<T> {
 
 impl<T: Seek + Read + Write> RaBuf<T> {
     #[cfg(feature = "buf_auto_buf_size")]
+    #[inline]
     fn setup_auto_buf_size(&mut self) -> Result<()> {
-        let val = self.auto_buf_size.buffer_size(&mut self.file)? / self.chunk_size;
+        let val = (self.auto_buf_size.buffer_size(&mut self.file)? / self.chunk_size) + 1;
         if val > self.chunks.len() {
             self.max_num_chunks = val;
         }
@@ -677,14 +761,20 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         }
     }
     //
+    #[inline]
     fn fetch_chunk(&mut self, offset: u64) -> Result<&mut Chunk> {
         let offset = offset & self.chunk_mask;
         if let Some((off, idx)) = self.fetch_cache {
             if off == offset {
                 self.touch(idx);
-                return Ok(&mut self.chunks[idx]);
+                //let chunk_mut =  &mut self.chunks[idx];
+                let chunk_mut = unsafe { self.chunks.get_unchecked_mut(idx) };
+                return Ok(chunk_mut);
             }
         }
+        self.fetch_chunk_0_(offset)
+    }
+    fn fetch_chunk_0_(&mut self, offset: u64) -> Result<&mut Chunk> {
         let idx = if let Some(x) = self.map.get(&offset) {
             x
         } else {
@@ -692,7 +782,9 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         };
         self.fetch_cache = Some((offset, idx));
         self.touch(idx);
-        Ok(&mut self.chunks[idx])
+        //let chunk_mut = &mut self.chunks[idx]
+        let chunk_mut = unsafe { self.chunks.get_unchecked_mut(idx) };
+        Ok(chunk_mut)
     }
     //
     fn add_chunk(&mut self, offset: u64) -> Result<usize> {
@@ -817,6 +909,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
 }
 
 impl<T: Seek + Read + Write> Read for RaBuf<T> {
+    #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let curr = self.pos;
         let len = {
@@ -839,6 +932,7 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
 }
 
 impl<T: Seek + Read + Write> Write for RaBuf<T> {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let curr = self.pos;
         let len = {
@@ -853,12 +947,8 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
         }
         Ok(len)
     }
+    #[inline]
     fn flush(&mut self) -> Result<()> {
-        /*
-        for chunk in self.chunks.iter_mut() {
-            chunk.write(self.end, &mut self.file)?;
-        }
-        */
         #[cfg(not(feature = "buf_idx_btreemap"))]
         for &(_, idx) in self.map.vec.iter() {
             self.chunks[idx].write(self.end, &mut self.file)?;
@@ -870,44 +960,6 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
         Ok(())
     }
 }
-
-/*
-impl<T: Seek + Read + Write> Seek for RaBuf<T> {
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        let new_pos = match pos {
-            SeekFrom::Start(x) => x,
-            SeekFrom::End(x) => {
-                if x < 0 {
-                    self.end - (-x) as u64
-                } else {
-                    // weren't automatically extended beyond the end.
-                    self.end - x as u64
-                }
-            }
-            SeekFrom::Current(x) => {
-                if x < 0 {
-                    self.pos - (-x) as u64
-                } else {
-                    self.pos + x as u64
-                }
-            }
-        };
-        if new_pos > self.end {
-            // makes a sparse file.
-            //self.set_len(new_pos)?;
-            return Err(Error::new(
-                ErrorKind::UnexpectedEof,
-                format!(
-                    "You tried to seek over the end of the file: {} < {}",
-                    self.end, new_pos
-                ),
-            ));
-        }
-        self.pos = new_pos;
-        Ok(new_pos)
-    }
-}
-*/
 
 impl<T: Seek + Read + Write> Drop for RaBuf<T> {
     /// Write all of the chunks to disk before closing the file.
