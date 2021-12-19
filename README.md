@@ -20,7 +20,7 @@ let path = "target/tmp/doc_test_1";
 let bw = b"ABCEDFG\nhijklmn\n";
 
 let f = File::create(path).unwrap();
-let mut bf = BufFile::new(f).unwrap();
+let mut bf = BufFile::new("tes", f).unwrap();
 bf.write_all(bw).unwrap();
 
 bf.seek(SeekFrom::Start(0)).unwrap();
@@ -43,12 +43,12 @@ let path = "target/tmp/doc_test_2";
 let bw = b"abcdefg\nHIJKLMN\n";
 {
     let f = File::create(path).unwrap();
-    let mut bf = BufFile::new(f).unwrap();
+    let mut bf = BufFile::new("tes", f).unwrap();
     bf.write_all(bw).unwrap();
 }
 {
     let f = File::open(path).unwrap();
-    let mut bf = BufFile::new(f).unwrap();
+    let mut bf = BufFile::new("tes", f).unwrap();
     let mut br = vec![0u8; bw.len()];
     bf.read_exact(&mut br).unwrap();
     assert_eq!(&br, bw);

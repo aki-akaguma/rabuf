@@ -19,7 +19,7 @@ let path = "target/tmp/doc_test_1";
 let bw = b"ABCEDFG\nhijklmn\n";
 
 let f = File::create(path).unwrap();
-let mut bf = BufFile::new(f).unwrap();
+let mut bf = BufFile::new("tes", f).unwrap();
 bf.write_all(bw).unwrap();
 
 bf.seek(SeekFrom::Start(0)).unwrap();
@@ -42,12 +42,12 @@ let path = "target/tmp/doc_test_2";
 let bw = b"abcdefg\nHIJKLMN\n";
 {
     let f = File::create(path).unwrap();
-    let mut bf = BufFile::new(f).unwrap();
+    let mut bf = BufFile::new("tes", f).unwrap();
     bf.write_all(bw).unwrap();
 }
 {
     let f = File::open(path).unwrap();
-    let mut bf = BufFile::new(f).unwrap();
+    let mut bf = BufFile::new("tes", f).unwrap();
     let mut br = vec![0u8; bw.len()];
     bf.read_exact(&mut br).unwrap();
     assert_eq!(&br, bw);
@@ -56,9 +56,6 @@ let bw = b"abcdefg\nHIJKLMN\n";
 */
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
-//use std::io::{Error, ErrorKind};
-#[cfg(feature = "buf_idx_btreemap")]
-use std::collections::BTreeMap;
 
 pub mod maybe;
 pub use maybe::MaybeSlice;
@@ -359,10 +356,9 @@ impl AutoBufferSize {
         Self(per_mille)
     }
     #[inline]
-    fn buffer_size<T: Seek>(&self, file: &mut T) -> Result<usize> {
+    fn buffer_size(&self, file_size: u64) -> Result<usize> {
         let per_mille = self.0;
         if per_mille > 0 {
-            let file_size = file.seek(SeekFrom::End(0))?;
             let val = if per_mille >= 1000 {
                 file_size
             } else {
@@ -496,39 +492,25 @@ impl Chunk {
 /// the value is the index of BufFile::data.
 #[derive(Debug)]
 struct OffsetIndex {
-    #[cfg(not(feature = "buf_idx_btreemap"))]
     vec: Vec<(u64, usize)>,
-    #[cfg(feature = "buf_idx_btreemap")]
-    btm: BTreeMap<u64, usize>,
 }
 impl OffsetIndex {
     fn with_capacity(_cap: usize) -> Self {
         Self {
-            #[cfg(not(feature = "buf_idx_btreemap"))]
             vec: Vec::with_capacity(_cap),
-            #[cfg(feature = "buf_idx_btreemap")]
-            btm: BTreeMap::new(),
         }
     }
     #[inline]
     fn get(&mut self, offset: &u64) -> Option<usize> {
-        #[cfg(not(feature = "buf_idx_btreemap"))]
         if let Ok(x) = self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             //Some(self.vec[x].1)
             Some(unsafe { self.vec.get_unchecked(x).1 })
         } else {
             None
         }
-        #[cfg(feature = "buf_idx_btreemap")]
-        if let Some(x) = self.btm.get(offset) {
-            Some(*x)
-        } else {
-            None
-        }
     }
     #[inline]
     fn insert(&mut self, offset: &u64, idx: usize) {
-        #[cfg(not(feature = "buf_idx_btreemap"))]
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => {
                 self.vec[x].1 = idx;
@@ -537,30 +519,24 @@ impl OffsetIndex {
                 self.vec.insert(x, (*offset, idx));
             }
         }
-        #[cfg(feature = "buf_idx_btreemap")]
-        let _ = self.btm.insert(*offset, idx);
     }
     fn remove(&mut self, offset: &u64) -> Option<usize> {
-        #[cfg(not(feature = "buf_idx_btreemap"))]
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => Some(self.vec.remove(x).1),
             Err(_x) => None,
         }
-        #[cfg(feature = "buf_idx_btreemap")]
-        self.btm.remove(offset)
     }
     #[inline]
     fn clear(&mut self) {
-        #[cfg(not(feature = "buf_idx_btreemap"))]
         self.vec.clear();
-        #[cfg(feature = "buf_idx_btreemap")]
-        self.btm.clear();
     }
 }
 
 /// Generic random access buffer.
 #[derive(Debug)]
 pub struct RaBuf<T: Seek + Read + Write> {
+    /// The name of rabuf for debugging.
+    name: String,
     /// The maximum number of chunk
     max_num_chunks: usize,
     /// Chunk buffer size in bytes.
@@ -583,15 +559,24 @@ pub struct RaBuf<T: Seek + Read + Write> {
     #[cfg(feature = "buf_lru")]
     uses_cnt: u32,
     //
-    // a minimum uses counter, but grater than 0.
+    /// a minimum uses counter, but grater than 0.
     #[cfg(feature = "buf_stats")]
     stats_min_uses: u32,
-    // a maximum uses counter
+    /// a maximum uses counter
     #[cfg(feature = "buf_stats")]
     stats_max_uses: u32,
-    // a per mille for the file size.
+    /// a per mille for the file size.
     #[cfg(feature = "buf_auto_buf_size")]
-    auto_buf_size: AutoBufferSize,
+    auto_buf_size: Option<AutoBufferSize>,
+    /// a count of fc hits.
+    #[cfg(feature = "buf_print_hits")]
+    count_of_hits_fc: u64,
+    /// a count of hits.
+    #[cfg(feature = "buf_print_hits")]
+    count_of_hits: u64,
+    /// a count of miss.
+    #[cfg(feature = "buf_print_hits")]
+    count_of_miss: u64,
 }
 
 // ref.) http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
@@ -613,19 +598,24 @@ pub fn roundup_powerof2(mut v: u32) -> u32 {
 impl<T: Seek + Read + Write> RaBuf<T> {
     /// Creates a new BufFile.
     /// number of chunk: 16, chunk size: 4096
-    pub fn new(file: T) -> Result<RaBuf<T>> {
+    pub fn new(name: &str, file: T) -> Result<RaBuf<T>> {
         #[cfg(not(feature = "buf_auto_buf_size"))]
         {
-            Self::with_capacity(file, CHUNK_SIZE, DEFAULT_NUM_CHUNKS)
+            Self::with_capacity(name, file, CHUNK_SIZE, DEFAULT_NUM_CHUNKS)
         }
         #[cfg(feature = "buf_auto_buf_size")]
         {
-            Self::with_per_mille(file, CHUNK_SIZE, DEFAULT_PER_MILLE)
+            Self::with_per_mille(name, file, CHUNK_SIZE, DEFAULT_PER_MILLE)
         }
     }
     /// Creates a new BufFile with the specified number of chunks.
     /// chunk_size is MUST power of 2.
-    pub fn with_capacity(mut file: T, chunk_size: u32, max_num_chunks: u16) -> Result<RaBuf<T>> {
+    pub fn with_capacity(
+        name: &str,
+        mut file: T,
+        chunk_size: u32,
+        max_num_chunks: u16,
+    ) -> Result<RaBuf<T>> {
         debug_assert!(chunk_size == roundup_powerof2(chunk_size));
         debug_assert!(max_num_chunks > 0);
         let max_num_chunks = max_num_chunks as usize;
@@ -635,6 +625,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         file.seek(SeekFrom::Start(0))?;
         //
         Ok(Self {
+            name: name.to_string(),
             max_num_chunks,
             chunk_size,
             chunk_mask,
@@ -651,22 +642,34 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             #[cfg(feature = "buf_stats")]
             stats_max_uses: 0,
             #[cfg(feature = "buf_auto_buf_size")]
-            auto_buf_size: AutoBufferSize::with_per_mille(0),
+            auto_buf_size: None,
+            #[cfg(feature = "buf_print_hits")]
+            count_of_hits_fc: 0,
+            #[cfg(feature = "buf_print_hits")]
+            count_of_hits: 0,
+            #[cfg(feature = "buf_print_hits")]
+            count_of_miss: 0,
         })
     }
     /// Create a new BufFile with auto buffer size per mille of file size.
     /// chunk_size is MUST power of 2.
     #[cfg(feature = "buf_auto_buf_size")]
-    pub fn with_per_mille(mut file: T, chunk_size: u32, per_mille: u16) -> Result<RaBuf<T>> {
+    pub fn with_per_mille(
+        name: &str,
+        mut file: T,
+        chunk_size: u32,
+        per_mille: u16,
+    ) -> Result<RaBuf<T>> {
         debug_assert!(chunk_size == roundup_powerof2(chunk_size));
         let chunk_mask = !(chunk_size as u64 - 1);
         let chunk_size = chunk_size as usize;
         let auto_buf_size = AutoBufferSize::with_per_mille(per_mille);
-        let max_num_chunks = (auto_buf_size.buffer_size(&mut file)? / chunk_size) + 1;
         let end = file.seek(SeekFrom::End(0))?;
+        let max_num_chunks = (auto_buf_size.buffer_size(end)? / chunk_size) + 1;
         file.seek(SeekFrom::Start(0))?;
         //
         Ok(Self {
+            name: name.to_string(),
             max_num_chunks,
             chunk_size,
             chunk_mask,
@@ -682,7 +685,13 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             stats_min_uses: 0,
             #[cfg(feature = "buf_stats")]
             stats_max_uses: 0,
-            auto_buf_size,
+            auto_buf_size: Some(auto_buf_size),
+            #[cfg(feature = "buf_print_hits")]
+            count_of_hits_fc: 0,
+            #[cfg(feature = "buf_print_hits")]
+            count_of_hits: 0,
+            #[cfg(feature = "buf_print_hits")]
+            count_of_miss: 0,
         })
     }
     /// Flush and clear all buffer chunks.
@@ -715,6 +724,11 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         }
         Ok(())
     }
+    /// Name for debugging
+    #[inline]
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
     ///
     #[cfg(feature = "buf_stats")]
     pub fn buf_stats(&self) -> Vec<(String, i64)> {
@@ -735,9 +749,11 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     #[cfg(feature = "buf_auto_buf_size")]
     #[inline]
     fn setup_auto_buf_size(&mut self) -> Result<()> {
-        let val = (self.auto_buf_size.buffer_size(&mut self.file)? / self.chunk_size) + 1;
-        if val > self.chunks.len() {
-            self.max_num_chunks = val;
+        if let Some(ab_sz) = &self.auto_buf_size {
+            let val = (ab_sz.buffer_size(self.end)? / self.chunk_size) + 1;
+            if val > self.chunks.len() {
+                self.max_num_chunks = val;
+            }
         }
         Ok(())
     }
@@ -766,6 +782,10 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let offset = offset & self.chunk_mask;
         if let Some((off, idx)) = self.fetch_cache {
             if off == offset {
+                #[cfg(feature = "buf_print_hits")]
+                {
+                    self.count_of_hits_fc += 1;
+                }
                 self.touch(idx);
                 //let chunk_mut =  &mut self.chunks[idx];
                 let chunk_mut = unsafe { self.chunks.get_unchecked_mut(idx) };
@@ -776,8 +796,16 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     }
     fn fetch_chunk_0_(&mut self, offset: u64) -> Result<&mut Chunk> {
         let idx = if let Some(x) = self.map.get(&offset) {
+            #[cfg(feature = "buf_print_hits")]
+            {
+                self.count_of_hits += 1;
+            }
             x
         } else {
+            #[cfg(feature = "buf_print_hits")]
+            {
+                self.count_of_miss += 1;
+            }
             self.add_chunk(offset)?
         };
         self.fetch_cache = Some((offset, idx));
@@ -895,7 +923,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             chunk.uses = 0;
         });
         vec2.iter().for_each(|v| {
-            self.map.insert(v.0, v.1);
+            self.map.insert(&v.0, v.1);
         });
         #[cfg(feature = "buf_auto_buf_size")]
         self.setup_auto_buf_size()?;
@@ -949,12 +977,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
     }
     #[inline]
     fn flush(&mut self) -> Result<()> {
-        #[cfg(not(feature = "buf_idx_btreemap"))]
         for &(_, idx) in self.map.vec.iter() {
-            self.chunks[idx].write(self.end, &mut self.file)?;
-        }
-        #[cfg(feature = "buf_idx_btreemap")]
-        for (_, &idx) in self.map.btm.iter() {
             self.chunks[idx].write(self.end, &mut self.file)?;
         }
         Ok(())
@@ -965,6 +988,17 @@ impl<T: Seek + Read + Write> Drop for RaBuf<T> {
     /// Write all of the chunks to disk before closing the file.
     fn drop(&mut self) {
         let _ = self.flush();
+        #[cfg(feature = "buf_print_hits")]
+        {
+            let all = self.count_of_hits_fc + self.count_of_hits + self.count_of_miss;
+            let hits_fc = self.count_of_hits_fc as f64 * 100.0 / all as f64;
+            let hits = self.count_of_hits as f64 * 100.0 / all as f64;
+            let kb = self.chunk_size as f64 * self.max_num_chunks as f64 / (1024.0 * 1024.0);
+            eprintln!(
+                "rabuf `{}` cache hits_fc: {:4.1}%, hits: {:4.1}%, {:4.1}mib",
+                self.name, hits_fc, hits, kb,
+            );
+        }
     }
 }
 
@@ -979,10 +1013,7 @@ mod debug {
         {
             #[cfg(not(feature = "buf_stats"))]
             {
-                #[cfg(not(feature = "buf_overf_rem_half"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 120);
-                #[cfg(feature = "buf_overf_rem_half")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 128);
+                assert_eq!(std::mem::size_of::<BufFile>(), 144);
             }
             #[cfg(feature = "buf_stats")]
             assert_eq!(std::mem::size_of::<BufFile>(), 128);
@@ -1006,10 +1037,10 @@ mod debug {
                     #[cfg(feature = "buf_overf_rem_half")]
                     assert_eq!(std::mem::size_of::<BufFile>(), 76);
                     #[cfg(feature = "buf_overf_rem_all")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                    assert_eq!(std::mem::size_of::<BufFile>(), 92);
                 }
                 #[cfg(target_arch = "arm")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 88);
+                assert_eq!(std::mem::size_of::<BufFile>(), 96);
             }
             #[cfg(all(feature = "buf_stats", feature = "buf_lru"))]
             {
@@ -1032,14 +1063,14 @@ mod debug {
                     #[cfg(not(feature = "buf_overf_rem_half"))]
                     assert_eq!(std::mem::size_of::<BufFile>(), 80);
                     #[cfg(feature = "buf_overf_rem_half")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 84);
+                    assert_eq!(std::mem::size_of::<BufFile>(), 92);
                 }
                 #[cfg(target_arch = "arm")]
                 {
                     #[cfg(not(feature = "buf_overf_rem_half"))]
                     assert_eq!(std::mem::size_of::<BufFile>(), 80);
                     #[cfg(feature = "buf_overf_rem_half")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
+                    assert_eq!(std::mem::size_of::<BufFile>(), 104);
                 }
             }
             //

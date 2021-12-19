@@ -1,6 +1,14 @@
-TBD
+TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
+
+0.1.6 (2021-12-19)
+=====
+
+* remove `buf_idx_btreemap` from features.
+* fix some bugs of `setup_auto_buf_size()`.
+* add name to `struct rabuf` for debugging.
+* add `buf_print_hits` to features.
 
 0.1.5 (2021-12-13)
 =====

@@ -18,7 +18,7 @@ mod test {
         let bw = b"ABCEDFG\nhijklmn\n";
         //
         let f = File::create(path).unwrap();
-        let mut bf = BufFile::new(f).unwrap();
+        let mut bf = BufFile::new("tes", f).unwrap();
         bf.write_all(bw).unwrap();
         //
         bf.seek(SeekFrom::Start(0)).unwrap();
@@ -35,12 +35,12 @@ mod test {
         let bw = b"abcdefg\nHIJKLMN\n";
         {
             let f = File::create(path).unwrap();
-            let mut bf = BufFile::new(f).unwrap();
+            let mut bf = BufFile::new("tes", f).unwrap();
             bf.write_all(bw).unwrap();
         }
         {
             let f = File::open(path).unwrap();
-            let mut bf = BufFile::new(f).unwrap();
+            let mut bf = BufFile::new("tes", f).unwrap();
             let mut br = vec![0u8; bw.len()];
             bf.read_exact(&mut br).unwrap();
             assert_eq!(&br, bw);
@@ -54,12 +54,12 @@ mod test {
         let bw = b"1234567\nABCDEFG\n8901234\nabcdefg\n";
         {
             let f = File::create(path).unwrap();
-            let mut bf = BufFile::with_capacity(f, 2, 4).unwrap();
+            let mut bf = BufFile::with_capacity("tes", f, 2, 4).unwrap();
             bf.write_all(bw).unwrap();
         }
         {
             let f = File::open(path).unwrap();
-            let mut bf = BufFile::new(f).unwrap();
+            let mut bf = BufFile::new("tes", f).unwrap();
             let mut br = vec![0u8; bw.len()];
             bf.read_exact(&mut br).unwrap();
             assert_eq!(&br, bw);
@@ -73,7 +73,7 @@ mod test {
         let bw = b"abcdefg\n";
         {
             let f = File::create(path).unwrap();
-            let mut bf = BufFile::with_capacity(f, 2, 4).unwrap();
+            let mut bf = BufFile::with_capacity("tes", f, 2, 4).unwrap();
             bf.seek(SeekFrom::End(0)).unwrap();
             // test a sparse file
             bf.seek(SeekFrom::Current(16)).unwrap();
@@ -81,7 +81,7 @@ mod test {
         }
         {
             let f = File::open(path).unwrap();
-            let mut bf = BufFile::new(f).unwrap();
+            let mut bf = BufFile::new("tes", f).unwrap();
             let mut br = vec![0u8; bw.len()];
             bf.seek(SeekFrom::Start(16)).unwrap();
             bf.read_exact(&mut br).unwrap();

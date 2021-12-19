@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+/// this is buffer, but maybe slice.
 #[derive(Debug, Clone)]
 pub enum MaybeSlice<'a> {
     Slice(&'a [u8]),
