@@ -2,6 +2,11 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.7 (2022-01-07)
+=====
+
+* fix some perforamance.
+
 0.1.6 (2021-12-19)
 =====
 

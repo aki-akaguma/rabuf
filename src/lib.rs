@@ -502,9 +502,10 @@ impl OffsetIndex {
     }
     #[inline]
     fn get(&mut self, offset: &u64) -> Option<usize> {
-        if let Ok(x) = self.vec.binary_search_by(|a| a.0.cmp(offset)) {
+        let slice = &self.vec;
+        if let Ok(x) = slice.binary_search_by(|a| a.0.cmp(offset)) {
             //Some(self.vec[x].1)
-            Some(unsafe { self.vec.get_unchecked(x).1 })
+            Some(unsafe { slice.get_unchecked(x).1 })
         } else {
             None
         }
