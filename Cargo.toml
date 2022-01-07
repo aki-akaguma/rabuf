@@ -1,6 +1,6 @@
 [package]
 name = "rabuf"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["aki <aki.akaguma@hotmail.com>"]
 edition = "2018"
 description = "randome access buffer for io"
@@ -11,7 +11,7 @@ readme = "README.md"
 repository = "https://github.com/aki-akaguma/rabuf"
 
 [features]
-default = ["buf_auto_buf_size", "buf_overf_rem_all", "buf_pin_zero"]
+default = ["buf_auto_buf_size", "buf_overf_rem_all", "buf_pin_zero", "buf_hash_turbo"]
 
 buf_auto_buf_size = []
 
@@ -22,6 +22,7 @@ buf_overf_rem = []
 buf_lru = []
 
 buf_pin_zero = []
+buf_hash_turbo = []
 
 buf_stats = []
 buf_print_hits = []

@@ -57,6 +57,9 @@ let bw = b"abcdefg\nHIJKLMN\n";
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 
+#[cfg(feature="buf_hash_turbo")]
+use std::collections::HashMap;
+
 pub mod maybe;
 pub use maybe::MaybeSlice;
 
@@ -493,25 +496,40 @@ impl Chunk {
 #[derive(Debug)]
 struct OffsetIndex {
     vec: Vec<(u64, usize)>,
+    #[cfg(feature="buf_hash_turbo")]
+    map: HashMap<u64, usize>,
 }
 impl OffsetIndex {
     fn with_capacity(_cap: usize) -> Self {
         Self {
             vec: Vec::with_capacity(_cap),
+            #[cfg(feature="buf_hash_turbo")]
+            map: HashMap::with_capacity(_cap),
         }
     }
     #[inline]
     fn get(&mut self, offset: &u64) -> Option<usize> {
-        let slice = &self.vec;
-        if let Ok(x) = slice.binary_search_by(|a| a.0.cmp(offset)) {
-            //Some(self.vec[x].1)
-            Some(unsafe { slice.get_unchecked(x).1 })
-        } else {
-            None
+        #[cfg(feature="buf_hash_turbo")]
+        {
+            self.map.get(offset).map(|&o| o)
+        }
+        #[cfg(not(feature="buf_hash_turbo"))]
+        {
+            let slice = &self.vec;
+            if let Ok(x) = slice.binary_search_by(|a| a.0.cmp(offset)) {
+                //Some(self.vec[x].1)
+                Some(unsafe { slice.get_unchecked(x).1 })
+            } else {
+                None
+            }
         }
     }
     #[inline]
     fn insert(&mut self, offset: &u64, idx: usize) {
+        #[cfg(feature="buf_hash_turbo")]
+        {
+            let _ = self.map.insert(*offset, idx);
+        }
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => {
                 self.vec[x].1 = idx;
@@ -522,6 +540,10 @@ impl OffsetIndex {
         }
     }
     fn remove(&mut self, offset: &u64) -> Option<usize> {
+        #[cfg(feature="buf_hash_turbo")]
+        {
+            let _ = self.map.remove(offset);
+        }
         match self.vec.binary_search_by(|a| a.0.cmp(offset)) {
             Ok(x) => Some(self.vec.remove(x).1),
             Err(_x) => None,
@@ -529,6 +551,10 @@ impl OffsetIndex {
     }
     #[inline]
     fn clear(&mut self) {
+        #[cfg(feature="buf_hash_turbo")]
+        {
+            self.map.clear();
+        }
         self.vec.clear();
     }
 }

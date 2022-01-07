@@ -2,6 +2,11 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.8 (2022-01-08)
+=====
+
+* add `buf_hash_turbo` to features. Important for Performance.
+
 0.1.7 (2022-01-07)
 =====
 
