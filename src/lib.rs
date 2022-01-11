@@ -10,7 +10,7 @@ this read and write in `Chunk` units and reduce IO operation.
 
 ```rust
 use rabuf::BufFile;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 std::fs::create_dir_all("target/tmp").unwrap();
@@ -18,7 +18,8 @@ std::fs::create_dir_all("target/tmp").unwrap();
 let path = "target/tmp/doc_test_1";
 let bw = b"ABCEDFG\nhijklmn\n";
 
-let f = File::create(path).unwrap();
+let f = OpenOptions::new().create(true)
+    .read(true).write(true).open(path).unwrap();
 let mut bf = BufFile::new("tes", f).unwrap();
 bf.write_all(bw).unwrap();
 
@@ -33,7 +34,7 @@ assert_eq!(&br, bw);
 
 ```rust
 use rabuf::BufFile;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 std::fs::create_dir_all("target/tmp").unwrap();
@@ -41,12 +42,14 @@ let path = "target/tmp/doc_test_2";
 
 let bw = b"abcdefg\nHIJKLMN\n";
 {
-    let f = File::create(path).unwrap();
+    let f = OpenOptions::new().create(true)
+        .read(true).write(true).open(path).unwrap();
     let mut bf = BufFile::new("tes", f).unwrap();
     bf.write_all(bw).unwrap();
 }
 {
-    let f = File::open(path).unwrap();
+    let f = OpenOptions::new().create(true)
+        .read(true).write(true).open(path).unwrap();
     let mut bf = BufFile::new("tes", f).unwrap();
     let mut br = vec![0u8; bw.len()];
     bf.read_exact(&mut br).unwrap();
@@ -57,7 +60,7 @@ let bw = b"abcdefg\nHIJKLMN\n";
 use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 
-#[cfg(feature="buf_hash_turbo")]
+#[cfg(feature = "buf_hash_turbo")]
 use std::collections::HashMap;
 
 pub mod maybe;
@@ -496,24 +499,24 @@ impl Chunk {
 #[derive(Debug)]
 struct OffsetIndex {
     vec: Vec<(u64, usize)>,
-    #[cfg(feature="buf_hash_turbo")]
+    #[cfg(feature = "buf_hash_turbo")]
     map: HashMap<u64, usize>,
 }
 impl OffsetIndex {
     fn with_capacity(_cap: usize) -> Self {
         Self {
             vec: Vec::with_capacity(_cap),
-            #[cfg(feature="buf_hash_turbo")]
+            #[cfg(feature = "buf_hash_turbo")]
             map: HashMap::with_capacity(_cap),
         }
     }
     #[inline]
     fn get(&mut self, offset: &u64) -> Option<usize> {
-        #[cfg(feature="buf_hash_turbo")]
+        #[cfg(feature = "buf_hash_turbo")]
         {
-            self.map.get(offset).map(|&o| o)
+            self.map.get(offset).copied()
         }
-        #[cfg(not(feature="buf_hash_turbo"))]
+        #[cfg(not(feature = "buf_hash_turbo"))]
         {
             let slice = &self.vec;
             if let Ok(x) = slice.binary_search_by(|a| a.0.cmp(offset)) {
@@ -526,7 +529,7 @@ impl OffsetIndex {
     }
     #[inline]
     fn insert(&mut self, offset: &u64, idx: usize) {
-        #[cfg(feature="buf_hash_turbo")]
+        #[cfg(feature = "buf_hash_turbo")]
         {
             let _ = self.map.insert(*offset, idx);
         }
@@ -540,7 +543,7 @@ impl OffsetIndex {
         }
     }
     fn remove(&mut self, offset: &u64) -> Option<usize> {
-        #[cfg(feature="buf_hash_turbo")]
+        #[cfg(feature = "buf_hash_turbo")]
         {
             let _ = self.map.remove(offset);
         }
@@ -551,7 +554,7 @@ impl OffsetIndex {
     }
     #[inline]
     fn clear(&mut self) {
-        #[cfg(feature="buf_hash_turbo")]
+        #[cfg(feature = "buf_hash_turbo")]
         {
             self.map.clear();
         }
@@ -756,6 +759,12 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     pub fn name(&self) -> String {
         self.name.clone()
     }
+    /// make preparation
+    #[inline]
+    pub fn prepare(&mut self, offset: u64) -> Result<()> {
+        let _ = self.fetch_chunk(offset)?;
+        Ok(())
+    }
     ///
     #[cfg(feature = "buf_stats")]
     pub fn buf_stats(&self) -> Vec<(String, i64)> {
@@ -843,6 +852,10 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     }
     //
     fn add_chunk(&mut self, offset: u64) -> Result<usize> {
+        #[cfg(feature = "buf_auto_buf_size")]
+        if self.chunks.len() == self.max_num_chunks {
+            self.setup_auto_buf_size()?;
+        }
         self.fetch_cache = None;
         if self.chunks.len() < self.max_num_chunks {
             let new_idx = self.chunks.len();
@@ -1022,7 +1035,7 @@ impl<T: Seek + Read + Write> Drop for RaBuf<T> {
             let hits = self.count_of_hits as f64 * 100.0 / all as f64;
             let kb = self.chunk_size as f64 * self.max_num_chunks as f64 / (1024.0 * 1024.0);
             eprintln!(
-                "rabuf `{}` cache hits_fc: {:4.1}%, hits: {:4.1}%, {:4.1}mib",
+                "rabuf \"{}\" cache hits_fc: {:4.1}%, hits: {:4.1}%, {:4.1}mib",
                 self.name, hits_fc, hits, kb,
             );
         }
@@ -1038,12 +1051,22 @@ mod debug {
     fn test_size_of() {
         #[cfg(target_pointer_width = "64")]
         {
-            #[cfg(not(feature = "buf_stats"))]
+            #[cfg(not(feature = "buf_hash_turbo"))]
             {
-                assert_eq!(std::mem::size_of::<BufFile>(), 144);
+                #[cfg(not(feature = "buf_stats"))]
+                {
+                    assert_eq!(std::mem::size_of::<BufFile>(), 144);
+                }
+                #[cfg(feature = "buf_stats")]
+                assert_eq!(std::mem::size_of::<BufFile>(), 128);
             }
-            #[cfg(feature = "buf_stats")]
-            assert_eq!(std::mem::size_of::<BufFile>(), 128);
+            #[cfg(feature = "buf_hash_turbo")]
+            {
+                #[cfg(not(feature = "buf_stats"))]
+                assert_eq!(std::mem::size_of::<BufFile>(), 192);
+                #[cfg(feature = "buf_stats")]
+                assert_eq!(std::mem::size_of::<BufFile>(), 200);
+            }
             //
             assert_eq!(std::mem::size_of::<Chunk>(), 40);
             assert_eq!(std::mem::size_of::<(u64, usize)>(), 16);
@@ -1052,52 +1075,106 @@ mod debug {
         }
         #[cfg(target_pointer_width = "32")]
         {
-            #[cfg(not(any(feature = "buf_stats", feature = "buf_lru")))]
+            #[cfg(not(feature = "buf_hash_turbo"))]
             {
-                #[cfg(not(target_arch = "arm"))]
+                #[cfg(not(any(feature = "buf_stats", feature = "buf_lru")))]
                 {
-                    #[cfg(not(any(
-                        feature = "buf_overf_rem_all",
-                        feature = "buf_overf_rem_half"
-                    )))]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
-                    #[cfg(feature = "buf_overf_rem_half")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 76);
-                    #[cfg(feature = "buf_overf_rem_all")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 92);
+                    #[cfg(not(target_arch = "arm"))]
+                    {
+                        #[cfg(not(any(
+                            feature = "buf_overf_rem_all",
+                            feature = "buf_overf_rem_half"
+                        )))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 76);
+                        #[cfg(feature = "buf_overf_rem_all")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 92);
+                    }
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
                 }
-                #[cfg(target_arch = "arm")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 96);
-            }
-            #[cfg(all(feature = "buf_stats", feature = "buf_lru"))]
-            {
-                #[cfg(not(target_arch = "arm"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 88);
-                #[cfg(target_arch = "arm")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 96);
-            }
-            #[cfg(all(feature = "buf_stats", not(feature = "buf_lru")))]
-            {
-                #[cfg(not(target_arch = "arm"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 84);
-                #[cfg(target_arch = "arm")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 96);
-            }
-            #[cfg(all(not(feature = "buf_stats"), feature = "buf_lru"))]
-            {
-                #[cfg(not(target_arch = "arm"))]
+                #[cfg(all(feature = "buf_stats", feature = "buf_lru"))]
                 {
-                    #[cfg(not(feature = "buf_overf_rem_half"))]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
-                    #[cfg(feature = "buf_overf_rem_half")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 92);
+                    #[cfg(not(target_arch = "arm"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 88);
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
                 }
-                #[cfg(target_arch = "arm")]
+                #[cfg(all(feature = "buf_stats", not(feature = "buf_lru")))]
                 {
-                    #[cfg(not(feature = "buf_overf_rem_half"))]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 80);
-                    #[cfg(feature = "buf_overf_rem_half")]
-                    assert_eq!(std::mem::size_of::<BufFile>(), 104);
+                    #[cfg(not(target_arch = "arm"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 84);
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
+                }
+                #[cfg(all(not(feature = "buf_stats"), feature = "buf_lru"))]
+                {
+                    #[cfg(not(target_arch = "arm"))]
+                    {
+                        #[cfg(not(feature = "buf_overf_rem_half"))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 92);
+                    }
+                    #[cfg(target_arch = "arm")]
+                    {
+                        #[cfg(not(feature = "buf_overf_rem_half"))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 104);
+                    }
+                }
+            }
+            #[cfg(feature = "buf_hash_turbo")]
+            {
+                #[cfg(not(any(feature = "buf_stats", feature = "buf_lru")))]
+                {
+                    #[cfg(not(target_arch = "arm"))]
+                    {
+                        #[cfg(not(any(
+                            feature = "buf_overf_rem_all",
+                            feature = "buf_overf_rem_half"
+                        )))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 76);
+                        #[cfg(feature = "buf_overf_rem_all")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 124);
+                    }
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 136);
+                }
+                #[cfg(all(feature = "buf_stats", feature = "buf_lru"))]
+                {
+                    #[cfg(not(target_arch = "arm"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 88);
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 96);
+                }
+                #[cfg(all(feature = "buf_stats", not(feature = "buf_lru")))]
+                {
+                    #[cfg(not(target_arch = "arm"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 132);
+                    #[cfg(target_arch = "arm")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 144);
+                }
+                #[cfg(all(not(feature = "buf_stats"), feature = "buf_lru"))]
+                {
+                    #[cfg(not(target_arch = "arm"))]
+                    {
+                        #[cfg(not(feature = "buf_overf_rem_half"))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 92);
+                    }
+                    #[cfg(target_arch = "arm")]
+                    {
+                        #[cfg(not(feature = "buf_overf_rem_half"))]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 80);
+                        #[cfg(feature = "buf_overf_rem_half")]
+                        assert_eq!(std::mem::size_of::<BufFile>(), 104);
+                    }
                 }
             }
             //

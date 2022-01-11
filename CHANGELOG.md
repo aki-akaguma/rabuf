@@ -2,6 +2,12 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.9 (2022-01-11)
+=====
+
+* add `prepare()` method to `RaBuf<T>`.
+* add `buf_auto_buf_size` support into `add_chunk()`, important performance.
+
 0.1.8 (2022-01-08)
 =====
 

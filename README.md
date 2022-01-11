@@ -11,7 +11,7 @@ this read and write in `Chunk` units and reduce IO operation.
 
 ```rust
 use rabuf::BufFile;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 std::fs::create_dir_all("target/tmp").unwrap();
@@ -19,7 +19,8 @@ std::fs::create_dir_all("target/tmp").unwrap();
 let path = "target/tmp/doc_test_1";
 let bw = b"ABCEDFG\nhijklmn\n";
 
-let f = File::create(path).unwrap();
+let f = OpenOptions::new().create(true)
+    .read(true).write(true).open(path).unwrap();
 let mut bf = BufFile::new("tes", f).unwrap();
 bf.write_all(bw).unwrap();
 
@@ -34,7 +35,7 @@ assert_eq!(&br, bw);
 
 ```rust
 use rabuf::BufFile;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 std::fs::create_dir_all("target/tmp").unwrap();
@@ -42,12 +43,14 @@ let path = "target/tmp/doc_test_2";
 
 let bw = b"abcdefg\nHIJKLMN\n";
 {
-    let f = File::create(path).unwrap();
+    let f = OpenOptions::new().create(true)
+        .read(true).write(true).open(path).unwrap();
     let mut bf = BufFile::new("tes", f).unwrap();
     bf.write_all(bw).unwrap();
 }
 {
-    let f = File::open(path).unwrap();
+    let f = OpenOptions::new().create(true)
+        .read(true).write(true).open(path).unwrap();
     let mut bf = BufFile::new("tes", f).unwrap();
     let mut br = vec![0u8; bw.len()];
     bf.read_exact(&mut br).unwrap();
