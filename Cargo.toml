@@ -1,6 +1,6 @@
 [package]
 name = "rabuf"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["aki <aki.akaguma@hotmail.com>"]
 edition = "2018"
 description = "randome access buffer for io"
@@ -26,5 +26,7 @@ buf_hash_turbo = []
 
 buf_stats = []
 buf_print_hits = []
+
+buf_debug = []
 
 [dependencies]

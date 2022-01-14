@@ -183,7 +183,13 @@ impl FileSync for BufFile {
 /// Read small bytes less than chunk size.
 pub trait SmallRead {
     /// Read one byte with a fast routine.
-    fn read_one_byte(&mut self) -> Result<u8>;
+    fn read_u8(&mut self) -> Result<u8>;
+    /// Read 2 bytes with a fast routine and return the little endian u16.
+    fn read_u16_le(&mut self) -> Result<u16>;
+    /// Read 4 bytes with a fast routine and return the little endian u32.
+    fn read_u32_le(&mut self) -> Result<u32>;
+    /// Read 8 bytes with a fast routine and return the little endian u64.
+    fn read_u64_le(&mut self) -> Result<u64>;
     /// Read maximum 8 bytes with a fast routine and return the little endian u64.
     fn read_max_8_bytes(&mut self, size: usize) -> Result<u64>;
     /// Read small size bytes with a fast routine. The small size is less than chunk size.
@@ -195,13 +201,17 @@ pub trait SmallRead {
 impl SmallRead for BufFile {
     /// Read one byte with a fast routine.
     #[inline]
-    fn read_one_byte(&mut self) -> Result<u8> {
+    fn read_u8(&mut self) -> Result<u8> {
         let curr = self.pos;
         let one_byte = {
             let chunk = self.fetch_chunk(curr)?;
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if !data_slice.is_empty() {
-                data_slice[0]
+            let st = (curr - chunk.offset) as usize;
+            if st < chunk.data.len() {
+                #[cfg(feature = "buf_debug")]
+                let val = chunk.data[st];
+                #[cfg(not(feature = "buf_debug"))]
+                let val = unsafe { *chunk.data.get_unchecked(st) };
+                val
             } else {
                 let mut buf = [0u8; 1];
                 let _ = self.read_exact(&mut buf)?;
@@ -211,6 +221,84 @@ impl SmallRead for BufFile {
         self.pos += 1;
         Ok(one_byte)
     }
+    #[inline]
+    fn read_u16_le(&mut self) -> Result<u16> {
+        const SIZE: usize = 2;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        let st = (curr - chunk.offset) as usize;
+        #[cfg(feature = "buf_debug")]
+        let data_slice = &chunk.data[st..];
+        #[cfg(not(feature = "buf_debug"))]
+        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        if data_slice.len() >= SIZE {
+            #[cfg(feature = "buf_debug")]
+            let slice = &data_slice[0..SIZE];
+            #[cfg(not(feature = "buf_debug"))]
+            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let mut ary = [0u8; SIZE];
+            ary.copy_from_slice(slice);
+            let val = u16::from_le_bytes(ary);
+            self.pos += SIZE as u64;
+            Ok(val)
+        } else {
+            let mut buf = [0u8; SIZE];
+            let _ = self.read_exact(&mut buf[..SIZE])?;
+            Ok(u16::from_le_bytes(buf))
+        }
+    }
+    #[inline]
+    fn read_u32_le(&mut self) -> Result<u32> {
+        const SIZE: usize = 4;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        let st = (curr - chunk.offset) as usize;
+        #[cfg(feature = "buf_debug")]
+        let data_slice = &chunk.data[st..];
+        #[cfg(not(feature = "buf_debug"))]
+        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        if data_slice.len() >= SIZE {
+            #[cfg(feature = "buf_debug")]
+            let slice = &data_slice[0..SIZE];
+            #[cfg(not(feature = "buf_debug"))]
+            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let mut ary = [0u8; SIZE];
+            ary.copy_from_slice(slice);
+            let val = u32::from_le_bytes(ary);
+            self.pos += SIZE as u64;
+            Ok(val)
+        } else {
+            let mut buf = [0u8; SIZE];
+            let _ = self.read_exact(&mut buf[..SIZE])?;
+            Ok(u32::from_le_bytes(buf))
+        }
+    }
+    #[inline]
+    fn read_u64_le(&mut self) -> Result<u64> {
+        const SIZE: usize = 8;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        let st = (curr - chunk.offset) as usize;
+        #[cfg(feature = "buf_debug")]
+        let data_slice = &chunk.data[st..];
+        #[cfg(not(feature = "buf_debug"))]
+        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        if data_slice.len() >= SIZE {
+            #[cfg(feature = "buf_debug")]
+            let slice = &data_slice[0..SIZE];
+            #[cfg(not(feature = "buf_debug"))]
+            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let mut ary = [0u8; SIZE];
+            ary.copy_from_slice(slice);
+            let val = u64::from_le_bytes(ary);
+            self.pos += SIZE as u64;
+            Ok(val)
+        } else {
+            let mut buf = [0u8; SIZE];
+            let _ = self.read_exact(&mut buf[..SIZE])?;
+            Ok(u64::from_le_bytes(buf))
+        }
+    }
     /// Read maximum 8 bytes with a fast routine and return little endian u64.
     #[inline]
     fn read_max_8_bytes(&mut self, size: usize) -> Result<u64> {
@@ -218,8 +306,12 @@ impl SmallRead for BufFile {
         let curr = self.pos;
         let max_8_bytes = {
             let chunk = self.fetch_chunk(curr)?;
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if !data_slice.is_empty() && data_slice.len() >= 8 {
+            let st = (curr - chunk.offset) as usize;
+            #[cfg(feature = "buf_debug")]
+            let data_slice = &chunk.data[st..];
+            #[cfg(not(feature = "buf_debug"))]
+            let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+            if data_slice.len() >= 8 {
                 let mut val = 0u64;
                 let mut i = size as i32 - 1;
                 while i >= 0 {
@@ -250,9 +342,12 @@ impl SmallRead for BufFile {
         let len = {
             let chunk = self.fetch_chunk(curr)?;
             let buf_len = buf.len();
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
-            if buf_len <= data_slice.len() {
-                buf.copy_from_slice(&data_slice[..buf_len]);
+            let st = (curr - chunk.offset) as usize;
+            if st + buf_len <= chunk.data.len() {
+                #[cfg(feature = "buf_debug")]
+                buf.copy_from_slice(&chunk.data[st..(st + buf_len)]);
+                #[cfg(not(feature = "buf_debug"))]
+                buf.copy_from_slice(&chunk.data[st..(st + buf_len)]);
                 buf_len
             } else {
                 self.read_exact(buf)?;
@@ -270,15 +365,26 @@ impl SmallRead for BufFile {
             let _ = self.fetch_chunk(curr)?;
             if let Some((offset, idx)) = self.fetch_cache {
                 let st = (curr - offset) as usize;
-                (idx, st, self.chunks[idx].data.len() - st)
+                #[cfg(feature = "buf_debug")]
+                let data_len = self.chunks[idx].data.len();
+                #[cfg(not(feature = "buf_debug"))]
+                let data_len = unsafe { self.chunks.get_unchecked(idx).data.len() };
+                (idx, st, data_len - st)
             } else {
                 (0, 0, 0)
             }
         };
         if size <= data_sz {
-            let data_slice = &self.chunks[idx].data[st..];
             self.pos += size as u64;
-            Ok(MaybeSlice::Slice(&data_slice[..size]))
+            #[cfg(feature = "buf_debug")]
+            let slice = &self.chunks[idx].data[st..(st + size)];
+            #[cfg(not(feature = "buf_debug"))]
+            let slice = unsafe {
+                &(self.chunks.get_unchecked(idx))
+                    .data
+                    .get_unchecked(st..(st + size))
+            };
+            Ok(MaybeSlice::Slice(slice))
         } else {
             let mut buf = vec![0u8; size];
             self.read_exact(&mut buf)?;
@@ -289,14 +395,117 @@ impl SmallRead for BufFile {
 
 /// Write small bytes less than chunk size.
 pub trait SmallWrite {
+    /// Write one byte with a fast routine.
+    fn write_u8(&mut self, val: u8) -> Result<()>;
+    /// Write little endian u16 with a fast routine.
+    fn write_u16_le(&mut self, val: u16) -> Result<()>;
+    /// Write little endian u32 with a fast routine.
+    fn write_u32_le(&mut self, val: u32) -> Result<()>;
+    /// Write little endian u64 with a fast routine.
+    fn write_u64_le(&mut self, val: u64) -> Result<()>;
     /// Write small size bytes with a fast routine. The small size is less than chunk size.
     fn write_all_small(&mut self, buf: &[u8]) -> Result<()>;
-    /// Write zero of length `size` with a fast routine.
+    /// Write `0u8` of length `size` with a fast routine.
     fn write_zero(&mut self, size: u32) -> Result<()>;
 }
 
 impl SmallWrite for BufFile {
-    /// Write small size bytes with a fast routine. The small size is less than chunk size.
+    #[inline]
+    fn write_u8(&mut self, val: u8) -> Result<()> {
+        const SIZE: usize = 1;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        chunk.dirty = true;
+        let st = (curr - chunk.offset) as usize;
+        if st + SIZE <= chunk.data.len() {
+            #[cfg(feature = "buf_debug")]
+            let dest = &mut chunk.data[st..(st + SIZE)];
+            #[cfg(not(feature = "buf_debug"))]
+            let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+            dest.copy_from_slice(&val.to_le_bytes());
+            self.pos += SIZE as u64;
+            if self.end < self.pos {
+                self.end = self.pos;
+            }
+            Ok(())
+        } else {
+            let mut buf = [0u8; SIZE];
+            buf.copy_from_slice(&val.to_le_bytes());
+            self.write_all(buf.as_slice())
+        }
+    }
+    #[inline]
+    fn write_u16_le(&mut self, val: u16) -> Result<()> {
+        const SIZE: usize = 2;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        chunk.dirty = true;
+        let st = (curr - chunk.offset) as usize;
+        if st + SIZE <= chunk.data.len() {
+            #[cfg(feature = "buf_debug")]
+            let dest = &mut chunk.data[st..(st + SIZE)];
+            #[cfg(not(feature = "buf_debug"))]
+            let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+            dest.copy_from_slice(&val.to_le_bytes());
+            self.pos += SIZE as u64;
+            if self.end < self.pos {
+                self.end = self.pos;
+            }
+            Ok(())
+        } else {
+            let mut buf = [0u8; SIZE];
+            buf.copy_from_slice(&val.to_le_bytes());
+            self.write_all(buf.as_slice())
+        }
+    }
+    #[inline]
+    fn write_u32_le(&mut self, val: u32) -> Result<()> {
+        const SIZE: usize = 4;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        chunk.dirty = true;
+        let st = (curr - chunk.offset) as usize;
+        if st + SIZE <= chunk.data.len() {
+            #[cfg(feature = "buf_debug")]
+            let dest = &mut chunk.data[st..(st + SIZE)];
+            #[cfg(not(feature = "buf_debug"))]
+            let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+            dest.copy_from_slice(&val.to_le_bytes());
+            self.pos += SIZE as u64;
+            if self.end < self.pos {
+                self.end = self.pos;
+            }
+            Ok(())
+        } else {
+            let mut buf = [0u8; SIZE];
+            buf.copy_from_slice(&val.to_le_bytes());
+            self.write_all(buf.as_slice())
+        }
+    }
+    #[inline]
+    fn write_u64_le(&mut self, val: u64) -> Result<()> {
+        const SIZE: usize = 8;
+        let curr = self.pos;
+        let chunk = self.fetch_chunk(curr)?;
+        chunk.dirty = true;
+        let st = (curr - chunk.offset) as usize;
+        if st + SIZE <= chunk.data.len() {
+            #[cfg(feature = "buf_debug")]
+            let dest = &mut chunk.data[st..(st + SIZE)];
+            #[cfg(not(feature = "buf_debug"))]
+            let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+            dest.copy_from_slice(&val.to_le_bytes());
+            self.pos += SIZE as u64;
+            if self.end < self.pos {
+                self.end = self.pos;
+            }
+            Ok(())
+        } else {
+            let mut buf = [0u8; SIZE];
+            buf.copy_from_slice(&val.to_le_bytes());
+            self.write_all(buf.as_slice())
+        }
+    }
     #[inline]
     fn write_all_small(&mut self, buf: &[u8]) -> Result<()> {
         debug_assert!(
@@ -308,11 +517,14 @@ impl SmallWrite for BufFile {
         let curr = self.pos;
         let len = {
             let chunk = self.fetch_chunk(curr)?;
-            let buf_len = buf.len();
             chunk.dirty = true;
-            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
-            if buf_len <= data_slice.len() {
-                let dest = &mut data_slice[..buf_len];
+            let buf_len = buf.len();
+            let st = (curr - chunk.offset) as usize;
+            if st + buf_len <= chunk.data.len() {
+                #[cfg(feature = "buf_debug")]
+                let dest = &mut chunk.data[st..(st + buf_len)];
+                #[cfg(not(feature = "buf_debug"))]
+                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + buf_len)) };
                 dest.copy_from_slice(buf);
                 buf_len
             } else {
@@ -325,7 +537,6 @@ impl SmallWrite for BufFile {
         }
         Ok(())
     }
-    /// Write zero of length `size` with a fast routine.
     #[inline]
     fn write_zero(&mut self, size: u32) -> Result<()> {
         let size = size as usize;
@@ -333,9 +544,12 @@ impl SmallWrite for BufFile {
         let len = {
             let chunk = self.fetch_chunk(curr)?;
             chunk.dirty = true;
-            let data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
-            if size <= data_slice.len() {
-                let dest = &mut data_slice[..size];
+            let st = (curr - chunk.offset) as usize;
+            if st + size <= chunk.data.len() {
+                #[cfg(feature = "buf_debug")]
+                let dest = &mut chunk.data[st..(st + size)];
+                #[cfg(not(feature = "buf_debug"))]
+                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + size)) };
                 dest.fill(0u8);
                 size
             } else {
@@ -448,10 +662,18 @@ impl Chunk {
         data.fill(0u8);
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
+            let _data_len = self.data.len();
+            #[cfg(feature = "buf_debug")]
             let buf = if end_off >= chunk_size {
                 &mut data[0..]
             } else {
                 &mut data[0..end_off]
+            };
+            #[cfg(not(feature = "buf_debug"))]
+            let buf = if end_off >= chunk_size {
+                unsafe { self.data.get_unchecked(0.._data_len) }
+            } else {
+                unsafe { self.data.get_unchecked(0..end_off) }
             };
             if let Err(err) = file.read_exact(buf) {
                 let _ = std::marker::PhantomData::<i32>;
@@ -475,10 +697,18 @@ impl Chunk {
         }
         file.seek(SeekFrom::Start(self.offset))?;
         let end_off = (end_pos - self.offset) as usize;
-        let buf = if end_off >= self.data.len() {
+        let data_len = self.data.len();
+        #[cfg(feature = "buf_debug")]
+        let buf = if end_off >= data_len {
             &self.data[0..]
         } else {
             &self.data[0..end_off]
+        };
+        #[cfg(not(feature = "buf_debug"))]
+        let buf = if end_off >= data_len {
+            unsafe { self.data.get_unchecked(0..data_len) }
+        } else {
+            unsafe { self.data.get_unchecked(0..end_off) }
         };
         match file.write_all(buf) {
             Ok(()) => {
@@ -983,13 +1213,25 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
         let len = {
             let chunk = self.fetch_chunk(curr)?;
             let buf_len = buf.len();
-            let data_slice = &chunk.data[(curr - chunk.offset) as usize..];
+            let st = (curr - chunk.offset) as usize;
+            let _data_len = chunk.data.len();
+            #[cfg(feature = "buf_debug")]
+            let data_slice = &chunk.data[st..];
+            #[cfg(not(feature = "buf_debug"))]
+            let data_slice = unsafe { chunk.data.get_unchecked(st.._data_len) };
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
-                buf.copy_from_slice(&data_slice[..buf_len]);
+                #[cfg(feature = "buf_debug")]
+                let slice = &data_slice[..buf_len];
+                #[cfg(not(feature = "buf_debug"))]
+                let slice = unsafe { data_slice.get_unchecked(0..buf_len) };
+                buf.copy_from_slice(slice);
                 buf_len
             } else {
+                #[cfg(feature = "buf_debug")]
                 let nallow_buf = &mut buf[..data_slice_len];
+                #[cfg(not(feature = "buf_debug"))]
+                let nallow_buf = unsafe { buf.get_unchecked_mut(0..data_slice_len) };
                 nallow_buf.copy_from_slice(data_slice);
                 data_slice_len
             }
@@ -1006,8 +1248,30 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
         let len = {
             let chunk = self.fetch_chunk(curr)?;
             chunk.dirty = true;
-            let mut data_slice = &mut chunk.data[(curr - chunk.offset) as usize..];
-            data_slice.write(buf)?
+            let buf_len = buf.len();
+            let st = (curr - chunk.offset) as usize;
+            let _data_len = chunk.data.len();
+            #[cfg(feature = "buf_debug")]
+            let data_slice = &mut chunk.data[st..];
+            #[cfg(not(feature = "buf_debug"))]
+            let data_slice = unsafe { chunk.data.get_unchecked_mut(st.._data_len) };
+            //data_slice.write(buf)?
+            let data_slice_len = data_slice.len();
+            if buf_len <= data_slice_len {
+                #[cfg(feature = "buf_debug")]
+                let slice = &mut data_slice[..buf_len];
+                #[cfg(not(feature = "buf_debug"))]
+                let slice = unsafe { data_slice.get_unchecked_mut(0..buf_len) };
+                slice.copy_from_slice(buf);
+                buf_len
+            } else {
+                #[cfg(feature = "buf_debug")]
+                let nallow_buf = &buf[..data_slice_len];
+                #[cfg(not(feature = "buf_debug"))]
+                let nallow_buf = unsafe { buf.get_unchecked(0..data_slice_len) };
+                data_slice.copy_from_slice(nallow_buf);
+                data_slice_len
+            }
         };
         self.pos += len as u64;
         if self.end < self.pos {

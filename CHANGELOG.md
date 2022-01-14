@@ -2,6 +2,14 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.10 (2022-01-14)
+=====
+
+* add `buf_debug` to features for debugging `rabuf`.
+* add `write_u8()`, `write_u16_le()`, `write_u32_le()` and `write_u64_le()`.
+* rename `read_one_byte()` to `read_u8()`.
+* add `read_u16_le()`, `read_u32_le()` and `read_u64_le()`.
+
 0.1.9 (2022-01-11)
 =====
 
