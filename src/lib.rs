@@ -63,6 +63,12 @@ use std::io::{Read, Result, Seek, SeekFrom, Write};
 #[cfg(feature = "buf_hash_turbo")]
 use std::collections::HashMap;
 
+#[cfg(feature = "buf_myhash")]
+use std::hash::BuildHasherDefault;
+
+#[cfg(feature = "buf_myhash")]
+use std::hash::Hasher;
+
 pub mod maybe;
 pub use maybe::MaybeSlice;
 
@@ -723,6 +729,41 @@ impl Chunk {
     }
 }
 
+/// MyHasher
+/// https://en.wikipedia.org/wiki/Xorshift
+#[derive(Debug, Default)]
+struct MyHasher(u64);
+
+impl Hasher for MyHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        let bytes_len = bytes.len();
+        if bytes_len == 8 {
+            let mut ary = [0u8; 8];
+            ary.copy_from_slice(bytes);
+            let mut a = u64::from_ne_bytes(ary);
+            a = a ^ a >> 12;
+            a = a ^ a << 25;
+            a = a ^ a >> 27;
+            self.0 = a;
+        } else {
+            for i in 0..bytes.len() {
+                let a = unsafe { *bytes.get_unchecked(i) };
+                self.0 = self.0.wrapping_add(a as u64);
+            }
+        }
+    }
+    fn write_u64(&mut self, val: u64) {
+        let mut a = val;
+        a = a ^ a >> 12;
+        a = a ^ a << 25;
+        a = a ^ a >> 27;
+        self.0 = a;
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
 /// Implements key-value sorted vec.
 /// the key is the offset from start the file.
 /// the value is the index of BufFile::data.
@@ -730,14 +771,22 @@ impl Chunk {
 struct OffsetIndex {
     vec: Vec<(u64, usize)>,
     #[cfg(feature = "buf_hash_turbo")]
+    #[cfg(not(feature = "buf_myhash"))]
     map: HashMap<u64, usize>,
+    #[cfg(feature = "buf_hash_turbo")]
+    #[cfg(feature = "buf_myhash")]
+    map: HashMap<u64, usize, BuildHasherDefault<MyHasher>>,
 }
 impl OffsetIndex {
     fn with_capacity(_cap: usize) -> Self {
         Self {
             vec: Vec::with_capacity(_cap),
             #[cfg(feature = "buf_hash_turbo")]
+            #[cfg(not(feature = "buf_myhash"))]
             map: HashMap::with_capacity(_cap),
+            #[cfg(feature = "buf_hash_turbo")]
+            #[cfg(feature = "buf_myhash")]
+            map: HashMap::with_capacity_and_hasher(_cap, Default::default()),
         }
     }
     #[inline]
@@ -1326,10 +1375,20 @@ mod debug {
             }
             #[cfg(feature = "buf_hash_turbo")]
             {
-                #[cfg(not(feature = "buf_stats"))]
-                assert_eq!(std::mem::size_of::<BufFile>(), 192);
-                #[cfg(feature = "buf_stats")]
-                assert_eq!(std::mem::size_of::<BufFile>(), 200);
+                #[cfg(not(feature = "buf_myhash"))]
+                {
+                    #[cfg(not(feature = "buf_stats"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 192);
+                    #[cfg(feature = "buf_stats")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 200);
+                }
+                #[cfg(feature = "buf_myhash")]
+                {
+                    #[cfg(not(feature = "buf_stats"))]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 176);
+                    #[cfg(feature = "buf_stats")]
+                    assert_eq!(std::mem::size_of::<BufFile>(), 184);
+                }
             }
             //
             assert_eq!(std::mem::size_of::<Chunk>(), 40);

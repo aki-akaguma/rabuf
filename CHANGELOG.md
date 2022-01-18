@@ -2,6 +2,11 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.11 (2022-01-18)
+=====
+
+* add `MyHasher` that has simple xorshift algorithm
+
 0.1.10 (2022-01-14)
 =====
 
