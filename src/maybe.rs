@@ -7,6 +7,15 @@ pub enum MaybeSlice<'a> {
     Buffer(Vec<u8>),
 }
 
+impl<'a> MaybeSlice<'a> {
+    pub fn into_vec(self) -> Vec<u8> {
+        match self {
+            MaybeSlice::Slice(x) => x.to_vec(),
+            MaybeSlice::Buffer(v) => v,
+        }
+    }
+}
+
 impl<'a> Deref for MaybeSlice<'a> {
     type Target = [u8];
     #[inline]

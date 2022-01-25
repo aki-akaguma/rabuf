@@ -2,6 +2,12 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.12 (2022-01-26)
+=====
+
+* add `write_u64_le_slice()` and `write_u64_le_slice2()` to `trait SmallWrite`
+* add `into_vec()` to `enum MaybeSlice`.
+
 0.1.11 (2022-01-18)
 =====
 
