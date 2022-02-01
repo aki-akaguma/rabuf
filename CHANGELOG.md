@@ -2,6 +2,11 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.13 (2022-02-01)
+=====
+
+* `Vec::get()` has been rewritten by pointer operation in the case of NOT "buf_debug".
+
 0.1.12 (2022-01-26)
 =====
 

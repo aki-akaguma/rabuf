@@ -109,7 +109,7 @@ impl FileSetLen for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let chunk = &self.chunks[i];
                 #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { self.chunks.get_unchecked(i) };
+                let chunk = unsafe { &*self.chunks.as_ptr().add(i) };
                 //
                 if chunk.offset + chunk.data.len() as u64 >= size {
                     // data end is over the new end
@@ -219,7 +219,7 @@ impl SmallRead for BufFile {
             #[cfg(feature = "buf_debug")]
             let val = chunk.data[st];
             #[cfg(not(feature = "buf_debug"))]
-            let val = unsafe { *chunk.data.get_unchecked(st) };
+            let val = unsafe { *chunk.data.as_ptr().add(st) };
             //
             self.pos += 1;
             Ok(val)
@@ -238,13 +238,15 @@ impl SmallRead for BufFile {
         #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
         #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        let data_slice = unsafe {
+            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+        };
         //
         if data_slice.len() >= SIZE {
             #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
             #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
@@ -269,13 +271,15 @@ impl SmallRead for BufFile {
         #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
         #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        let data_slice = unsafe {
+            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+        };
         //
         if data_slice.len() >= SIZE {
             #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
             #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
@@ -300,19 +304,27 @@ impl SmallRead for BufFile {
         #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
         #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+        let data_slice = unsafe {
+            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+        };
         //
         if data_slice.len() >= SIZE {
             #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
             #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { &data_slice.get_unchecked(0..SIZE) };
+            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
                 ary.copy_from_slice(slice);
                 u64::from_le_bytes(ary)
             };
+            /*<CHECK>
+            let val: u64 = unsafe {
+                *std::mem::transmute::<*const u8, *const u64>(data_slice.as_ptr())
+            };
+            let val = u64::from_le(val);
+            */
             //
             self.pos += SIZE as u64;
             Ok(val)
@@ -333,37 +345,25 @@ impl SmallRead for BufFile {
             #[cfg(feature = "buf_debug")]
             let data_slice = &chunk.data[st..];
             #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe { &chunk.data.get_unchecked(st..chunk.data.len()) };
+            let data_slice = unsafe {
+                std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+            };
             //
             if data_slice.len() >= 8 {
                 let val = {
                     let mut val = 0u64;
                     let mut i = size as i32 - 1;
                     while i >= 0 {
-                        let byte = unsafe { *data_slice.get_unchecked(i as usize) };
+                        #[cfg(feature = "buf_debug")]
+                        let byte = data_slice[i as usize];
+                        #[cfg(not(feature = "buf_debug"))]
+                        let byte = unsafe { *data_slice.as_ptr().add(i as usize) };
+                        //
                         val = val << 8 | byte as u64;
                         i -= 1;
                     }
                     val
                 };
-                //
-                /*
-                let val = {
-                    let mut ary = [0u8; 8];
-                    //
-                    #[cfg(feature = "buf_debug")]
-                    let dest = &mut ary[..size];
-                    #[cfg(not(feature = "buf_debug"))]
-                    let dest = unsafe { ary.get_unchecked_mut(0..size) };
-                    #[cfg(feature = "buf_debug")]
-                    let src = &data_slice[..size];
-                    #[cfg(not(feature = "buf_debug"))]
-                    let src = unsafe { data_slice.get_unchecked(0..size) };
-                    //
-                    dest.copy_from_slice(src);
-                    u64::from_le_bytes(ary)
-                };
-                */
                 //
                 self.pos += size as u64;
                 val
@@ -390,9 +390,11 @@ impl SmallRead for BufFile {
         let st = (curr - chunk.offset) as usize;
         if st + buf_len <= chunk.data.len() {
             #[cfg(feature = "buf_debug")]
-            buf.copy_from_slice(&chunk.data[st..(st + buf_len)]);
+            let slice = &chunk.data[st..(st + buf_len)];
             #[cfg(not(feature = "buf_debug"))]
-            buf.copy_from_slice(&chunk.data[st..(st + buf_len)]);
+            let slice = unsafe { std::slice::from_raw_parts(chunk.data.as_ptr().add(st), buf_len) };
+            //
+            buf.copy_from_slice(slice);
             self.pos += buf_len as u64;
             Ok(())
         } else {
@@ -408,10 +410,12 @@ impl SmallRead for BufFile {
             let _ = self.fetch_chunk(curr)?;
             if let Some((offset, idx)) = self.fetch_cache {
                 let st = (curr - offset) as usize;
+                //
                 #[cfg(feature = "buf_debug")]
                 let data_len = self.chunks[idx].data.len();
                 #[cfg(not(feature = "buf_debug"))]
-                let data_len = unsafe { self.chunks.get_unchecked(idx).data.len() };
+                let data_len = unsafe { (*self.chunks.as_ptr().add(idx)).data.len() };
+                //
                 (idx, st, data_len - st)
             } else {
                 (0, 0, 0)
@@ -424,9 +428,10 @@ impl SmallRead for BufFile {
             let slice = &self.chunks[idx].data[st..(st + size)];
             #[cfg(not(feature = "buf_debug"))]
             let slice = unsafe {
-                &(self.chunks.get_unchecked(idx))
-                    .data
-                    .get_unchecked(st..(st + size))
+                std::slice::from_raw_parts(
+                    (*(self.chunks.as_ptr().add(idx))).data.as_ptr().add(st),
+                    size,
+                )
             };
             //
             return Ok(MaybeSlice::Slice(slice));
@@ -469,7 +474,9 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
+                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -498,7 +505,9 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
+                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -527,7 +536,9 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
+                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -556,7 +567,9 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + SIZE)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
+                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -581,23 +594,19 @@ impl SmallWrite for BufFile {
             let st = (curr - chunk.offset) as usize;
             if st + size <= chunk.data.len() {
                 chunk.dirty = true;
+                #[cfg(feature = "buf_debug")]
                 for i in 0..val_slice.len() {
-                    #[cfg(feature = "buf_debug")]
-                    {
-                        let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
-                        let val = &val_slice[i];
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
-                    #[cfg(not(feature = "buf_debug"))]
-                    {
-                        let dest = unsafe {
-                            chunk
-                                .data
-                                .get_unchecked_mut((st + i * 8)..(st + (i + 1) * 8))
-                        };
-                        let val = unsafe { val_slice.get_unchecked(i) };
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
+                    let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
+                    let val = &val_slice[i];
+                    dest.copy_from_slice(&val.to_le_bytes());
+                }
+                #[cfg(not(feature = "buf_debug"))]
+                for i in 0..val_slice.len() {
+                    let dest = unsafe {
+                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st + i * 8), 8)
+                    };
+                    let val = unsafe { &*(val_slice.as_ptr().add(i)) };
+                    dest.copy_from_slice(&val.to_le_bytes());
                 }
                 self.pos += size as u64;
                 if self.end < self.pos {
@@ -608,19 +617,18 @@ impl SmallWrite for BufFile {
         }
         {
             let mut buf = vec![0u8; size];
+            #[cfg(feature = "buf_debug")]
             for i in 0..val_slice.len() {
-                #[cfg(feature = "buf_debug")]
-                {
-                    let dest = &mut buf[i * 8..(i + 1) * 8];
-                    let val = &val_slice[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                {
-                    let dest = unsafe { buf.get_unchecked_mut(i * 8..(i + 1) * 8) };
-                    let val = unsafe { val_slice.get_unchecked(i) };
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
+                let dest = &mut buf[i * 8..(i + 1) * 8];
+                let val = &val_slice[i];
+                dest.copy_from_slice(&val.to_le_bytes());
+            }
+            #[cfg(not(feature = "buf_debug"))]
+            for i in 0..val_slice.len() {
+                let dest =
+                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(i * 8), 8) };
+                let val = unsafe { &*val_slice.as_ptr().add(i) };
+                dest.copy_from_slice(&val.to_le_bytes());
             }
             self.write_all(buf.as_slice())
         }
@@ -634,42 +642,34 @@ impl SmallWrite for BufFile {
             let st = (curr - chunk.offset) as usize;
             if st + size <= chunk.data.len() {
                 chunk.dirty = true;
+                #[cfg(feature = "buf_debug")]
                 for i in 0..val_slice1.len() {
-                    #[cfg(feature = "buf_debug")]
-                    {
-                        let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
-                        let val = &val_slice1[i];
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
-                    #[cfg(not(feature = "buf_debug"))]
-                    {
-                        let dest = unsafe {
-                            chunk
-                                .data
-                                .get_unchecked_mut((st + i * 8)..(st + (i + 1) * 8))
-                        };
-                        let val = unsafe { val_slice1.get_unchecked(i) };
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
+                    let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
+                    let val = &val_slice1[i];
+                    dest.copy_from_slice(&val.to_le_bytes());
+                }
+                #[cfg(not(feature = "buf_debug"))]
+                for i in 0..val_slice1.len() {
+                    let dest = unsafe {
+                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st + i * 8), 8)
+                    };
+                    let val = unsafe { &*val_slice1.as_ptr().add(i) };
+                    dest.copy_from_slice(&val.to_le_bytes());
                 }
                 let st2 = st + 8 * val_slice1.len();
+                #[cfg(feature = "buf_debug")]
                 for i in 0..val_slice2.len() {
-                    #[cfg(feature = "buf_debug")]
-                    {
-                        let dest = &mut chunk.data[(st2 + i * 8)..(st2 + (i + 1) * 8)];
-                        let val = &val_slice2[i];
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
-                    #[cfg(not(feature = "buf_debug"))]
-                    {
-                        let dest = unsafe {
-                            chunk
-                                .data
-                                .get_unchecked_mut((st2 + i * 8)..(st2 + (i + 1) * 8))
-                        };
-                        let val = unsafe { val_slice2.get_unchecked(i) };
-                        dest.copy_from_slice(&val.to_le_bytes());
-                    }
+                    let dest = &mut chunk.data[(st2 + i * 8)..(st2 + (i + 1) * 8)];
+                    let val = &val_slice2[i];
+                    dest.copy_from_slice(&val.to_le_bytes());
+                }
+                #[cfg(not(feature = "buf_debug"))]
+                for i in 0..val_slice2.len() {
+                    let dest = unsafe {
+                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st2 + i * 8), 8)
+                    };
+                    let val = unsafe { &*val_slice2.as_ptr().add(i) };
+                    dest.copy_from_slice(&val.to_le_bytes());
                 }
                 self.pos += size as u64;
                 if self.end < self.pos {
@@ -680,34 +680,32 @@ impl SmallWrite for BufFile {
         }
         {
             let mut buf = vec![0u8; size];
+            #[cfg(feature = "buf_debug")]
             for i in 0..val_slice1.len() {
-                #[cfg(feature = "buf_debug")]
-                {
-                    let dest = &mut buf[i * 8..(i + 1) * 8];
-                    let val = &val_slice1[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                {
-                    let dest = unsafe { buf.get_unchecked_mut(i * 8..(i + 1) * 8) };
-                    let val = unsafe { val_slice1.get_unchecked(i) };
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
+                let dest = &mut buf[i * 8..(i + 1) * 8];
+                let val = &val_slice1[i];
+                dest.copy_from_slice(&val.to_le_bytes());
+            }
+            #[cfg(not(feature = "buf_debug"))]
+            for i in 0..val_slice1.len() {
+                let dest =
+                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(i * 8), 8) };
+                let val = unsafe { &*val_slice1.as_ptr().add(i) };
+                dest.copy_from_slice(&val.to_le_bytes());
             }
             let st2 = 8 * val_slice1.len();
+            #[cfg(feature = "buf_debug")]
             for i in 0..val_slice2.len() {
-                #[cfg(feature = "buf_debug")]
-                {
-                    let dest = &mut buf[(st2 + i * 8)..(st2 + (i + 1) * 8)];
-                    let val = &val_slice2[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                {
-                    let dest = unsafe { buf.get_unchecked_mut((st2 + i * 8)..(st2 + (i + 1) * 8)) };
-                    let val = unsafe { val_slice2.get_unchecked(i) };
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
+                let dest = &mut buf[(st2 + i * 8)..(st2 + (i + 1) * 8)];
+                let val = &val_slice2[i];
+                dest.copy_from_slice(&val.to_le_bytes());
+            }
+            #[cfg(not(feature = "buf_debug"))]
+            for i in 0..val_slice2.len() {
+                let dest =
+                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(st2 + i * 8), 8) };
+                let val = unsafe { &*val_slice2.as_ptr().add(i) };
+                dest.copy_from_slice(&val.to_le_bytes());
             }
             self.write_all(buf.as_slice())
         }
@@ -731,9 +729,12 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + buf_len)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + buf_len)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), buf_len)
+                };
                 //
                 dest.copy_from_slice(buf);
+                //
                 self.pos += buf_len as u64;
                 if self.end < self.pos {
                     self.end = self.pos;
@@ -756,9 +757,12 @@ impl SmallWrite for BufFile {
                 #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + size)];
                 #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe { chunk.data.get_unchecked_mut(st..(st + size)) };
+                let dest = unsafe {
+                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), size)
+                };
                 //
                 dest.fill(0u8);
+                //
                 self.pos += size as u64;
                 if self.end < self.pos {
                     self.end = self.pos;
@@ -835,17 +839,23 @@ impl Chunk {
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
             #[cfg(feature = "buf_debug")]
-            let buf = if end_off >= chunk_size {
+            let buf = if chunk_size <= end_off {
                 &mut data[0..]
             } else {
                 &mut data[0..end_off]
             };
             #[cfg(not(feature = "buf_debug"))]
-            let buf = if end_off >= chunk_size {
-                unsafe { data.get_unchecked_mut(0..chunk_size) }
-            } else {
-                unsafe { data.get_unchecked_mut(0..end_off) }
+            let buf = unsafe {
+                std::slice::from_raw_parts_mut(
+                    data.as_mut_ptr(),
+                    if chunk_size <= end_off {
+                        chunk_size
+                    } else {
+                        end_off
+                    },
+                )
             };
+            //
             if let Err(err) = file.read_exact(buf) {
                 let _ = std::marker::PhantomData::<i32>;
                 return Err(err);
@@ -870,23 +880,27 @@ impl Chunk {
         let chunk_size = self.data.len();
         //
         file.seek(SeekFrom::Start(offset))?;
-        let data = &mut self.data;
-        data.fill(0u8);
+        self.data.fill(0u8);
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
-            let _data_len = self.data.len();
             #[cfg(feature = "buf_debug")]
-            let buf = if end_off >= chunk_size {
-                &mut data[0..]
+            let buf = if chunk_size <= end_off {
+                &mut self.data[0..]
             } else {
-                &mut data[0..end_off]
+                &mut self.data[0..end_off]
             };
             #[cfg(not(feature = "buf_debug"))]
-            let buf = if end_off >= chunk_size {
-                unsafe { self.data.get_unchecked(0.._data_len) }
-            } else {
-                unsafe { self.data.get_unchecked(0..end_off) }
+            let buf = unsafe {
+                std::slice::from_raw_parts_mut(
+                    self.data.as_mut_ptr(),
+                    if chunk_size <= end_off {
+                        chunk_size
+                    } else {
+                        end_off
+                    },
+                )
             };
+            //
             if let Err(err) = file.read_exact(buf) {
                 let _ = std::marker::PhantomData::<i32>;
                 return Err(err);
@@ -909,19 +923,25 @@ impl Chunk {
         }
         file.seek(SeekFrom::Start(self.offset))?;
         let end_off = (end_pos - self.offset) as usize;
-        let data_len = self.data.len();
+        let chunk_size = self.data.len();
         #[cfg(feature = "buf_debug")]
-        let buf = if end_off >= data_len {
+        let buf = if chunk_size <= end_off {
             &self.data[0..]
         } else {
             &self.data[0..end_off]
         };
         #[cfg(not(feature = "buf_debug"))]
-        let buf = if end_off >= data_len {
-            unsafe { self.data.get_unchecked(0..data_len) }
-        } else {
-            unsafe { self.data.get_unchecked(0..end_off) }
+        let buf = unsafe {
+            std::slice::from_raw_parts(
+                self.data.as_ptr(),
+                if chunk_size <= end_off {
+                    chunk_size
+                } else {
+                    end_off
+                },
+            )
         };
+        //
         match file.write_all(buf) {
             Ok(()) => {
                 self.dirty = false;
@@ -958,6 +978,7 @@ impl Hasher for MyHasher {
             }
         }
     }
+    #[inline]
     fn write_u64(&mut self, val: u64) {
         let mut a = val;
         a = a ^ a >> 12;
@@ -965,6 +986,7 @@ impl Hasher for MyHasher {
         a = a ^ a >> 27;
         self.0 = a;
     }
+    #[inline]
     fn finish(&self) -> u64 {
         self.0
     }
@@ -994,7 +1016,7 @@ impl OffsetIndex {
             map: HashMap::with_capacity(_cap),
             #[cfg(feature = "buf_hash_turbo")]
             #[cfg(feature = "buf_myhash")]
-            map: HashMap::with_capacity_and_hasher(_cap, Default::default()),
+            map: HashMap::with_capacity_and_hasher(_cap * 2, Default::default()),
         }
     }
     #[inline]
@@ -1010,7 +1032,7 @@ impl OffsetIndex {
                 #[cfg(feature = "buf_debug")]
                 let val = self.vec[x].1;
                 #[cfg(not(feature = "buf_debug"))]
-                let val = unsafe { slice.get_unchecked(x).1 };
+                let val = unsafe { (*(slice.as_ptr().add(x))).1 };
                 //
                 Some(val)
             } else {
@@ -1039,8 +1061,7 @@ impl OffsetIndex {
     fn remove(&mut self, offset: &u64) -> Option<usize> {
         #[cfg(feature = "buf_hash_turbo")]
         {
-            let r = self.map.remove(offset);
-            r
+            self.map.remove(offset)
         }
         #[cfg(not(feature = "buf_hash_turbo"))]
         {
@@ -1328,7 +1349,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let chunk_mut = &mut self.chunks[idx];
                 #[cfg(not(feature = "buf_debug"))]
-                let chunk_mut = unsafe { self.chunks.get_unchecked_mut(idx) };
+                let chunk_mut = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
                 //
                 return Ok(chunk_mut);
             }
@@ -1354,7 +1375,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         #[cfg(feature = "buf_debug")]
         let chunk_mut = &mut self.chunks[idx];
         #[cfg(not(feature = "buf_debug"))]
-        let chunk_mut = unsafe { self.chunks.get_unchecked_mut(idx) };
+        let chunk_mut = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
         //
         Ok(chunk_mut)
     }
@@ -1504,19 +1525,20 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
             let chunk = self.fetch_chunk(curr)?;
             let buf_len = buf.len();
             let st = (curr - chunk.offset) as usize;
-            let _data_len = chunk.data.len();
             //
             #[cfg(feature = "buf_debug")]
             let data_slice = &chunk.data[st..];
             #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe { chunk.data.get_unchecked(st.._data_len) };
+            let data_slice = unsafe {
+                std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+            };
             //
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
                 #[cfg(feature = "buf_debug")]
                 let slice = &data_slice[..buf_len];
                 #[cfg(not(feature = "buf_debug"))]
-                let slice = unsafe { data_slice.get_unchecked(0..buf_len) };
+                let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), buf_len) };
                 //
                 buf.copy_from_slice(slice);
                 buf_len
@@ -1524,7 +1546,8 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let nallow_buf = &mut buf[..data_slice_len];
                 #[cfg(not(feature = "buf_debug"))]
-                let nallow_buf = unsafe { buf.get_unchecked_mut(0..data_slice_len) };
+                let nallow_buf =
+                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr(), data_slice_len) };
                 //
                 nallow_buf.copy_from_slice(data_slice);
                 data_slice_len
@@ -1544,18 +1567,23 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
             chunk.dirty = true;
             let buf_len = buf.len();
             let st = (curr - chunk.offset) as usize;
-            let _data_len = chunk.data.len();
             #[cfg(feature = "buf_debug")]
             let data_slice = &mut chunk.data[st..];
             #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe { chunk.data.get_unchecked_mut(st.._data_len) };
+            let data_slice = unsafe {
+                std::slice::from_raw_parts_mut(
+                    chunk.data.as_mut_ptr().add(st),
+                    chunk.data.len() - st,
+                )
+            };
             //
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
                 #[cfg(feature = "buf_debug")]
                 let slice = &mut data_slice[..buf_len];
                 #[cfg(not(feature = "buf_debug"))]
-                let slice = unsafe { data_slice.get_unchecked_mut(0..buf_len) };
+                let slice =
+                    unsafe { std::slice::from_raw_parts_mut(data_slice.as_mut_ptr(), buf_len) };
                 //
                 slice.copy_from_slice(buf);
                 buf_len
@@ -1563,7 +1591,8 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let nallow_buf = &buf[..data_slice_len];
                 #[cfg(not(feature = "buf_debug"))]
-                let nallow_buf = unsafe { buf.get_unchecked(0..data_slice_len) };
+                let nallow_buf =
+                    unsafe { std::slice::from_raw_parts(buf.as_ptr(), data_slice_len) };
                 //
                 data_slice.copy_from_slice(nallow_buf);
                 data_slice_len
@@ -1579,7 +1608,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
     fn flush(&mut self) -> Result<()> {
         #[cfg(feature = "buf_hash_turbo")]
         {
-            let mut off_vec: Vec<u64> = self.map.map.keys().map(|&a| a).collect();
+            let mut off_vec: Vec<u64> = self.map.map.keys().copied().collect();
             off_vec.sort_unstable();
             for off in off_vec.iter() {
                 let idx = self.map.map[off];
@@ -1587,7 +1616,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let chunk = &mut self.chunks[idx];
                 #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { self.chunks.get_unchecked_mut(idx) };
+                let chunk = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
                 //
                 chunk.write(self.end, &mut self.file)?;
             }
@@ -1598,7 +1627,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let chunk = &mut self.chunks[idx];
                 #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { self.chunks.get_unchecked_mut(idx) };
+                let chunk = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
                 //
                 chunk.write(self.end, &mut self.file)?;
             }
