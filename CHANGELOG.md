@@ -2,6 +2,11 @@ TBD: rabuf
 ===
 Unreleased changes. Release notes have not yet been written.
 
+0.1.14 (2022-02-19)
+=====
+
+* some fix: minimum support rustc `1.48.0`.
+
 0.1.13 (2022-02-01)
 =====
 

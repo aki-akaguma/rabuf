@@ -4,6 +4,14 @@ The Buffer for random access file.
 When you read and write a file,
 this read and write in `Chunk` units and reduce IO operation.
 
+# Features
+
+- random access
+- `Chunk` units os io operation
+- reduce os io operation
+- support small size access accel.
+- minimum support rustc 1.48.0 (7eac88abb 2020-11-16)
+
 # Examples
 
 ## Write, Seek, Read
@@ -489,7 +497,7 @@ impl SmallWrite for BufFile {
         {
             let mut buf = [0u8; SIZE];
             buf.copy_from_slice(&val.to_le_bytes());
-            self.write_all(buf.as_slice())
+            self.write_all(&buf)
         }
     }
     #[inline]
@@ -520,7 +528,7 @@ impl SmallWrite for BufFile {
         {
             let mut buf = [0u8; SIZE];
             buf.copy_from_slice(&val.to_le_bytes());
-            self.write_all(buf.as_slice())
+            self.write_all(&buf)
         }
     }
     #[inline]
@@ -551,7 +559,7 @@ impl SmallWrite for BufFile {
         {
             let mut buf = [0u8; SIZE];
             buf.copy_from_slice(&val.to_le_bytes());
-            self.write_all(buf.as_slice())
+            self.write_all(&buf)
         }
     }
     #[inline]
@@ -582,7 +590,7 @@ impl SmallWrite for BufFile {
         {
             let mut buf = [0u8; SIZE];
             buf.copy_from_slice(&val.to_le_bytes());
-            return self.write_all(buf.as_slice());
+            self.write_all(&buf)
         }
     }
     #[inline]
@@ -761,7 +769,10 @@ impl SmallWrite for BufFile {
                     std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), size)
                 };
                 //
-                dest.fill(0u8);
+                //dest.fill(0u8);
+                for item in dest.iter_mut() {
+                    *item = 0u8;
+                }
                 //
                 self.pos += size as u64;
                 if self.end < self.pos {

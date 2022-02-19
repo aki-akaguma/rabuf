@@ -5,6 +5,14 @@ The Buffer for random access file.
 When you read and write a file,
 this read and write in `Chunk` units and reduce IO operation.
 
+## Features
+
+- random access
+- `Chunk` units os io operation
+- reduce os io operation
+- support small size access accel.
+- minimum support rustc rustc 1.48.0 (7eac88abb 2020-11-16)
+
 ## Examples
 
 ### Write, Seek, Read
