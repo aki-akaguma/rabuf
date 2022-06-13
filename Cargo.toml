@@ -2,7 +2,7 @@
 name = "rabuf"
 version = "0.1.14"
 authors = ["aki <aki.akaguma@hotmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "randome access buffer for io"
 keywords = ["buffer", "io"]
 categories = ["memory-management", "data-structures"]
