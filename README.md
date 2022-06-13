@@ -11,7 +11,7 @@ this read and write in `Chunk` units and reduce IO operation.
 - `Chunk` units os io operation
 - reduce os io operation
 - support small size access accel.
-- minimum support rustc rustc 1.48.0 (7eac88abb 2020-11-16)
+- minimum support rustc 1.56.1 (59eed8a2a 2021-11-01)
 
 ## Examples
 
