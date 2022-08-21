@@ -233,7 +233,7 @@ impl SmallRead for BufFile {
             Ok(val)
         } else {
             let mut buf = [0u8; 1];
-            let _ = self.read_exact(&mut buf)?;
+            self.read_exact(&mut buf)?;
             Ok(buf[0])
         }
     }
@@ -266,7 +266,7 @@ impl SmallRead for BufFile {
             Ok(val)
         } else {
             let mut buf = [0u8; SIZE];
-            let _ = self.read_exact(&mut buf[..SIZE])?;
+            self.read_exact(&mut buf[..SIZE])?;
             Ok(u16::from_le_bytes(buf))
         }
     }
@@ -299,7 +299,7 @@ impl SmallRead for BufFile {
             Ok(val)
         } else {
             let mut buf = [0u8; SIZE];
-            let _ = self.read_exact(&mut buf[..SIZE])?;
+            self.read_exact(&mut buf[..SIZE])?;
             Ok(u32::from_le_bytes(buf))
         }
     }
@@ -338,7 +338,7 @@ impl SmallRead for BufFile {
             Ok(val)
         } else {
             let mut buf = [0u8; SIZE];
-            let _ = self.read_exact(&mut buf[..SIZE])?;
+            self.read_exact(&mut buf[..SIZE])?;
             Ok(u64::from_le_bytes(buf))
         }
     }
@@ -377,7 +377,7 @@ impl SmallRead for BufFile {
                 val
             } else {
                 let mut buf = [0u8; 8];
-                let _ = self.read_exact(&mut buf[..size])?;
+                self.read_exact(&mut buf[..size])?;
                 u64::from_le_bytes(buf)
             }
         };
