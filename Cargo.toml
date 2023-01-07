@@ -8,6 +8,7 @@ keywords = ["buffer", "io"]
 categories = ["memory-management", "data-structures"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+rust-version = "1.56.0"
 repository = "https://github.com/aki-akaguma/rabuf"
 
 [features]
