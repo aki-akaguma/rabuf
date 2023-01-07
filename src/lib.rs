@@ -968,9 +968,11 @@ impl Chunk {
 
 /// MyHasher
 /// https://en.wikipedia.org/wiki/Xorshift
+#[cfg(feature = "buf_myhash")]
 #[derive(Debug, Default)]
 struct MyHasher(u64);
 
+#[cfg(feature = "buf_myhash")]
 impl Hasher for MyHasher {
     fn write(&mut self, bytes: &[u8]) {
         let bytes_len = bytes.len();
@@ -1458,7 +1460,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 // Make a new chunk, write the old chunk to disk, replace old chunk
                 self.chunks[min_idx].write(self.end, &mut self.file)?;
                 self.map.remove(&self.chunks[min_idx].offset);
-                self.map.insert(offset, min_idx);
+                self.map.insert(&offset, min_idx);
                 self.chunks[min_idx].read_inplace(offset, self.end, &mut self.file)?;
                 #[cfg(feature = "buf_auto_buf_size")]
                 self.setup_auto_buf_size()?;
@@ -1774,7 +1776,16 @@ mod debug {
                         #[cfg(feature = "buf_overf_rem_half")]
                         assert_eq!(std::mem::size_of::<BufFile>(), 76);
                         #[cfg(feature = "buf_overf_rem_all")]
-                        assert_eq!(std::mem::size_of::<BufFile>(), 124);
+                        {
+                            #[cfg(target_pointer_width = "64")]
+                            {
+                                assert_eq!(std::mem::size_of::<BufFile>(), 124);
+                            }
+                            #[cfg(target_pointer_width = "32")]
+                            {
+                                assert_eq!(std::mem::size_of::<BufFile>(), 96);
+                            }
+                        }
                     }
                     #[cfg(target_arch = "arm")]
                     assert_eq!(std::mem::size_of::<BufFile>(), 136);

@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * version difference link into `CHANGELOG.md`
 * rust-version = "1.56.0" into Cargo.toml
+* `all-test-version` target into Makefile
 
 ### Changed
 * rename target `test-no_std` to `test-no-default-features` on Makefile
 
 ### Removed
 * remove bench-all target from Makefile, no used
+
+### Fixed
+* bug: it can not be compiled at `--no-default-features`.
+
 
 ## [0.1.16] (2023-01-05)
 ### Fixed
