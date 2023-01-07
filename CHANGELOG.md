@@ -5,35 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased] *
+### Added
+* version difference link into `CHANGELOG.md`
 
 
-## 0.1.16 (2023-01-05)
+## [0.1.16] (2023-01-05)
 ### Fixed
 * clippy: this let-binding has unit value
 
-## 0.1.15 (2022-06-13)
+## [0.1.15] (2022-06-13)
 ### Changed
 * changes to edition 2021
 
-## 0.1.14 (2022-02-19)
+## [0.1.14] (2022-02-19)
 ### Fixed
 * minimum support rustc `1.48.0`.
 
-## 0.1.13 (2022-02-01)
+## [0.1.13] (2022-02-01)
 ### Changed
 * `Vec::get()` has been rewritten by pointer operation in the case of NOT "buf_debug".
 
-## 0.1.12 (2022-01-26)
+## [0.1.12] (2022-01-26)
 ### Added
 * add `write_u64_le_slice()` and `write_u64_le_slice2()` to `trait SmallWrite`
 * add `into_vec()` to `enum MaybeSlice`.
 
-## 0.1.11 (2022-01-18)
+## [0.1.11] (2022-01-18)
 ### Added
 * add `MyHasher` that has simple xorshift algorithm
 
-## 0.1.10 (2022-01-14)
+## [0.1.10] (2022-01-14)
 ### Added
 * add `buf_debug` to features for debugging `rabuf`.
 * add `write_u8()`, `write_u16_le()`, `write_u32_le()` and `write_u64_le()`.
@@ -42,20 +44,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 * rename `read_one_byte()` to `read_u8()`.
 
-## 0.1.9 (2022-01-11)
+## [0.1.9] (2022-01-11)
 ### Added
 * add `prepare()` method to `RaBuf<T>`.
 * add `buf_auto_buf_size` support into `add_chunk()`, important performance.
 
-## 0.1.8 (2022-01-08)
+## [0.1.8] (2022-01-08)
 ### Added
 * add `buf_hash_turbo` to features. Important for Performance.
 
-## 0.1.7 (2022-01-07)
+## [0.1.7] (2022-01-07)
 ### Fixed
 * perforamance.
 
-## 0.1.6 (2021-12-19)
+## [0.1.6] (2021-12-19)
 ### Added
 * add name to `struct rabuf` for debugging.
 * add `buf_print_hits` to features.
@@ -67,11 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * remove `buf_idx_btreemap` from features.
 
 
-## 0.1.5 (2021-12-13)
+## [0.1.5] (2021-12-13)
 ### Added
 * add `read_fill_buffer()`.
 
-## 0.1.4 (2021-12-05)
+## [0.1.4] (2021-12-05)
 ### Added
 * add `buf_pin_zero` to features
 * add `buf_auto_buf_size` to features
@@ -79,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 * bug: create methods of `struct RaBuf<T>`.
 
-## 0.1.3 (2021-11-26)
+## [0.1.3] (2021-11-26)
 ### Added
 * add `buf_overf_rem_all` and `buf_overf_rem_half` to features.
 
@@ -87,14 +89,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * rewrite flush() method to be written out in the order of offset.
 * rewrite the remove strategy at the over limit by the half/all remove.
 
-## 0.1.2 (2021-11-17)
+## [0.1.2] (2021-11-17)
 ### Added
 * add features: buf_lru, buf_stats
 
-## 0.1.1 (2021-11-11)
+## [0.1.1] (2021-11-11)
 ### Added
 * add tests
 * add trait and impl: FileSetLen, FileSync, SmallRead, SmallWrite
 
-## 0.1.0 (2021-11-10)
+## [0.1.0] (2021-11-10)
 * first commit
