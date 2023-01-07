@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * version difference link into `CHANGELOG.md`
 * rust-version = "1.56.0" into Cargo.toml
 
+### Removed
+* remove bench-all target from Makefile, no used
 
 ## [0.1.16] (2023-01-05)
 ### Fixed
