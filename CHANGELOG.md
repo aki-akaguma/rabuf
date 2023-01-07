@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * bug: it can not be compiled at `--no-default-features`.
+* clippy: https://rust-lang.github.io/rust-clippy/master/index.html#seek_to_start_instead_of_rewind
 
 
 ## [0.1.16] (2023-01-05)

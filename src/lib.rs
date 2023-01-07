@@ -1187,7 +1187,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let chunk_mask = !(chunk_size as u64 - 1);
         let chunk_size = chunk_size as usize;
         let end = file.seek(SeekFrom::End(0))?;
-        file.seek(SeekFrom::Start(0))?;
+        file.rewind()?;
         //
         Ok(Self {
             name: name.to_string(),
@@ -1231,7 +1231,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let auto_buf_size = AutoBufferSize::with_per_mille(per_mille);
         let end = file.seek(SeekFrom::End(0))?;
         let max_num_chunks = (auto_buf_size.buffer_size(end)? / chunk_size) + 1;
-        file.seek(SeekFrom::Start(0))?;
+        file.rewind()?;
         //
         Ok(Self {
             name: name.to_string(),
