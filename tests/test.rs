@@ -27,7 +27,7 @@ mod test {
         let mut bf = BufFile::new("tes", f).unwrap();
         bf.write_all(bw).unwrap();
         //
-        bf.seek(SeekFrom::Start(0)).unwrap();
+        bf.rewind().unwrap();
         //
         let mut br = vec![0u8; bw.len()];
         bf.read_exact(&mut br).unwrap();

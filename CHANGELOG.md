@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * Makefile: rustc version `1.66.0` to `1.66.1`
+* clippy: `seek_to_start_instead_of_rewind`
 
 
 ## [0.1.17] (2023-01-10)
