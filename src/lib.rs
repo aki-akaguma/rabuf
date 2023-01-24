@@ -1671,8 +1671,10 @@ impl<T: Seek + Read + Write> Drop for RaBuf<T> {
 //--
 #[cfg(test)]
 mod debug {
+    #[cfg(not(windows))]
     use super::{BufFile, Chunk};
     //
+    #[cfg(not(windows))]
     #[test]
     fn test_size_of() {
         #[cfg(target_pointer_width = "64")]
