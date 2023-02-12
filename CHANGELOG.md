@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] *
+## [Unreleased]
+
+
+## [0.1.19] (2023-02-12)
 ### Added
 * `.github/workflows/test-ubuntu.yml`
 * `.github/workflows/test-macos.yml`
@@ -21,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * `LICENSE-APACHE`, `LICENSE-MIT`
-
 
 ## [0.1.18] (2023-01-28)
 ### Added
@@ -141,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] (2021-11-10)
 * first commit
 
-[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.1.18..HEAD
+[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.1.19..HEAD
+[0.1.19]: https://github.com/aki-akaguma/rabuf/compare/v0.1.18..v0.1.19
 [0.1.18]: https://github.com/aki-akaguma/rabuf/compare/v0.1.17..v0.1.18
 [0.1.17]: https://github.com/aki-akaguma/rabuf/compare/v0.1.16..v0.1.17
 [0.1.16]: https://github.com/aki-akaguma/rabuf/compare/v0.1.15..v0.1.16
