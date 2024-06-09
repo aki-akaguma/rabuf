@@ -18,6 +18,7 @@ mod test {
         let bw = b"ABCEDFG\nhijklmn\n";
         //
         let f = OpenOptions::new()
+            .create(true)
             .truncate(true)
             .read(true)
             .write(true)
@@ -40,6 +41,7 @@ mod test {
         let bw = b"abcdefg\nHIJKLMN\n";
         {
             let f = OpenOptions::new()
+                .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
@@ -68,6 +70,7 @@ mod test {
         let bw = b"1234567\nABCDEFG\n8901234\nabcdefg\n";
         {
             let f = OpenOptions::new()
+                .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
@@ -96,6 +99,7 @@ mod test {
         let bw = b"abcdefg\n";
         let pos = {
             let f = OpenOptions::new()
+                .create(true)
                 .truncate(true)
                 .read(true)
                 .write(true)
