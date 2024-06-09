@@ -17,9 +17,8 @@ mod test {
         let path = concat!(base_dir!(), "/test_1");
         let bw = b"ABCEDFG\nhijklmn\n";
         //
-        //let f = File::create(path).unwrap();
         let f = OpenOptions::new()
-            .create(true)
+            .truncate(true)
             .read(true)
             .write(true)
             .open(path)
@@ -40,9 +39,8 @@ mod test {
         //
         let bw = b"abcdefg\nHIJKLMN\n";
         {
-            //let f = File::create(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
+                .truncate(true)
                 .read(true)
                 .write(true)
                 .open(path)
@@ -51,9 +49,7 @@ mod test {
             bf.write_all(bw).unwrap();
         }
         {
-            //let f = File::open(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
                 .read(true)
                 .write(true)
                 .open(path)
@@ -71,9 +67,8 @@ mod test {
         //
         let bw = b"1234567\nABCDEFG\n8901234\nabcdefg\n";
         {
-            //let f = File::create(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
+                .truncate(true)
                 .read(true)
                 .write(true)
                 .open(path)
@@ -82,9 +77,7 @@ mod test {
             bf.write_all(bw).unwrap();
         }
         {
-            //let f = File::open(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
                 .read(true)
                 .write(true)
                 .open(path)
@@ -102,9 +95,8 @@ mod test {
         //
         let bw = b"abcdefg\n";
         let pos = {
-            //let f = File::create(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
+                .truncate(true)
                 .read(true)
                 .write(true)
                 .open(path)
@@ -117,9 +109,7 @@ mod test {
             pos
         };
         {
-            //let f = File::open(path).unwrap();
             let f = OpenOptions::new()
-                .create(true)
                 .read(true)
                 .write(true)
                 .open(path)
