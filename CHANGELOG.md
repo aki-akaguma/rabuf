@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+
+## [0.1.20] (2024-06-09)
 ### Fixed
 * clippy: clippy::suspicious_open_options
-
 
 ## [0.1.19] (2023-02-12)
 ### Added
@@ -145,7 +147,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] (2021-11-10)
 * first commit
 
-[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.1.19..HEAD
+[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.1.20..HEAD
+[0.1.20]: https://github.com/aki-akaguma/rabuf/compare/v0.1.19..v0.1.20
 [0.1.19]: https://github.com/aki-akaguma/rabuf/compare/v0.1.18..v0.1.19
 [0.1.18]: https://github.com/aki-akaguma/rabuf/compare/v0.1.17..v0.1.18
 [0.1.17]: https://github.com/aki-akaguma/rabuf/compare/v0.1.16..v0.1.17
