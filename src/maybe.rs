@@ -7,7 +7,7 @@ pub enum MaybeSlice<'a> {
     Buffer(Vec<u8>),
 }
 
-impl<'a> MaybeSlice<'a> {
+impl MaybeSlice<'_> {
     pub fn into_vec(self) -> Vec<u8> {
         match self {
             MaybeSlice::Slice(x) => x.to_vec(),
@@ -16,7 +16,7 @@ impl<'a> MaybeSlice<'a> {
     }
 }
 
-impl<'a> Deref for MaybeSlice<'a> {
+impl Deref for MaybeSlice<'_> {
     type Target = [u8];
     #[inline]
     fn deref(&self) -> &<Self as Deref>::Target {
