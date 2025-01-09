@@ -367,7 +367,7 @@ impl SmallRead for BufFile {
                         #[cfg(not(feature = "buf_debug"))]
                         let byte = unsafe { *data_slice.as_ptr().add(i as usize) };
                         //
-                        val = val << 8 | byte as u64;
+                        val = (val << 8) | byte as u64;
                         i -= 1;
                     }
                     val
@@ -980,9 +980,9 @@ impl Hasher for MyHasher {
             let mut ary = [0u8; 8];
             ary.copy_from_slice(bytes);
             let mut a = u64::from_ne_bytes(ary);
-            a = a ^ a >> 12;
-            a = a ^ a << 25;
-            a = a ^ a >> 27;
+            a = a ^ (a >> 12);
+            a = a ^ (a << 25);
+            a = a ^ (a >> 27);
             self.0 = a;
         } else {
             for i in 0..bytes.len() {
@@ -994,9 +994,9 @@ impl Hasher for MyHasher {
     #[inline]
     fn write_u64(&mut self, val: u64) {
         let mut a = val;
-        a = a ^ a >> 12;
-        a = a ^ a << 25;
-        a = a ^ a >> 27;
+        a = a ^ (a >> 12);
+        a = a ^ (a << 25);
+        a = a ^ (a >> 27);
         self.0 = a;
     }
     #[inline]
