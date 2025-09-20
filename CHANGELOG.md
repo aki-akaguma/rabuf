@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * `specs`
 
+### Fixed
+* bug: Reading at file sizes below `chunk` size will result in an infinite loop.
+
 
 ## [0.1.20] (2024-06-09)
 ### Fixed

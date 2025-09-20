@@ -845,6 +845,15 @@ impl Chunk {
         chunk_size: usize,
         file: &mut U,
     ) -> Result<Chunk> {
+        if offset >= end_pos {
+            return Ok(Chunk {
+                data: vec![0u8; chunk_size],
+                offset,
+                dirty: false,
+                #[cfg(not(feature = "buf_overf_rem_all"))]
+                uses: 0,
+            });
+        }
         file.seek(SeekFrom::Start(offset))?;
         let mut data = vec![0u8; chunk_size];
         if offset != end_pos {
@@ -1534,16 +1543,31 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let curr = self.pos;
+        let ed = self.end;
         let len = {
             let chunk = self.fetch_chunk(curr)?;
+            if ed < chunk.offset {
+                return Ok(0);
+            }
             let buf_len = buf.len();
             let st = (curr - chunk.offset) as usize;
+            let ed = (ed - chunk.offset) as usize;
             //
-            #[cfg(feature = "buf_debug")]
-            let data_slice = &chunk.data[st..];
-            #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe {
-                std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+            let data_slice = if ed > chunk.data.len() {
+                #[cfg(feature = "buf_debug")]
+                let data_slice = &chunk.data[st..];
+                #[cfg(not(feature = "buf_debug"))]
+                let data_slice = unsafe {
+                    std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
+                };
+                data_slice
+            } else {
+                #[cfg(feature = "buf_debug")]
+                let data_slice = &chunk.data[st..ed];
+                #[cfg(not(feature = "buf_debug"))]
+                let data_slice =
+                    unsafe { std::slice::from_raw_parts(chunk.data.as_ptr().add(st), ed - st) };
+                data_slice
             };
             //
             let data_slice_len = data_slice.len();
