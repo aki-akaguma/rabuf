@@ -37,14 +37,20 @@ mod test {
         bf.seek(SeekFrom::Current(5)).unwrap();
         let mut br = vec![0u8; 5];
         bf.read_exact(&mut br).unwrap();
-        assert_eq!(&br, &bw[(seek_pos + 5 + 5) as usize..(seek_pos + 5 + 5 + 5) as usize]);
+        assert_eq!(
+            &br,
+            &bw[(seek_pos + 5 + 5) as usize..(seek_pos + 5 + 5 + 5) as usize]
+        );
 
         // Seek from end and read
         let seek_from_end = 10;
         bf.seek(SeekFrom::End(-(seek_from_end as i64))).unwrap();
         let mut br = vec![0u8; 5];
         bf.read_exact(&mut br).unwrap();
-        assert_eq!(&br, &bw[(bw.len() - seek_from_end) as usize..(bw.len() - seek_from_end + 5) as usize]);
+        assert_eq!(
+            &br,
+            &bw[(bw.len() - seek_from_end)..(bw.len() - seek_from_end + 5)]
+        );
     }
 
     #[test]
@@ -68,7 +74,10 @@ mod test {
         bf.seek(SeekFrom::Start(chunk_size as u64 - 4)).unwrap();
         let mut br = vec![0u8; 8];
         bf.read_exact(&mut br).unwrap();
-        assert_eq!(&br, &bw[(chunk_size - 4) as usize..(chunk_size + 4) as usize]);
+        assert_eq!(
+            &br,
+            &bw[(chunk_size - 4) as usize..(chunk_size + 4) as usize]
+        );
 
         // Write across chunk boundary
         bf.seek(SeekFrom::Start(chunk_size as u64 - 4)).unwrap();
@@ -80,7 +89,10 @@ mod test {
         bf.read_exact(&mut br).unwrap();
 
         let mut expected_data = bw.to_vec();
-        expected_data.splice((chunk_size - 4) as usize..(chunk_size + 4) as usize, new_data.iter().cloned());
+        expected_data.splice(
+            (chunk_size - 4) as usize..(chunk_size + 4) as usize,
+            new_data.iter().cloned(),
+        );
         assert_eq!(&br, &expected_data);
     }
 
