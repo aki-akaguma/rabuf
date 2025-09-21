@@ -33,3 +33,6 @@ buf_print_hits = []
 buf_debug = []
 
 [dependencies]
+
+[dev-dependencies]
+function_name = "0.3"
