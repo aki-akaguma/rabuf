@@ -28,6 +28,9 @@ fmt:
 doc:
 	cargo doc
 
+check-size:
+	cargo run --example check_size
+
 tarpaulin:
 	cargo tarpaulin --offline --engine llvm --out html --output-dir ./target
 
