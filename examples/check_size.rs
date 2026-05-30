@@ -1,6 +1,7 @@
-use rabuf::{BufFile, Chunk};
+use rabuf::BufFile;
 
 fn main() {
-    println!("BufFile size: {} bytes", std::mem::size_of::<BufFile>());
-    println!("Chunk size: {} bytes", std::mem::size_of::<Chunk>());
+    let (buf_file_size, chunk_size) = BufFile::get_internal_sizes();
+    println!("BufFile size: {} bytes", buf_file_size);
+    println!("Chunk size: {} bytes", chunk_size);
 }

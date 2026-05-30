@@ -1226,6 +1226,11 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         ));
         vec
     }
+
+    /// Helper to get internal struct sizes for manual verification.
+    pub fn get_internal_sizes() -> (usize, usize) {
+        (std::mem::size_of::<BufFile>(), std::mem::size_of::<Chunk>())
+    }
 }
 
 impl<T: Seek + Read + Write> RaBuf<T> {
