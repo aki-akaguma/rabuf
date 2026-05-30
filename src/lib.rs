@@ -626,31 +626,13 @@ impl SmallWrite for BufFile {
         }
         {
             let mut buf = vec![0u8; size];
-            #[cfg(feature = "buf_debug")]
-            for i in 0..val_slice1.len() {
+            for (i, val) in val_slice1.iter().enumerate() {
                 let dest = &mut buf[i * 8..(i + 1) * 8];
-                let val = &val_slice1[i];
-                dest.copy_from_slice(&val.to_le_bytes());
-            }
-            #[cfg(not(feature = "buf_debug"))]
-            for i in 0..val_slice1.len() {
-                let dest =
-                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(i * 8), 8) };
-                let val = unsafe { &*val_slice1.as_ptr().add(i) };
                 dest.copy_from_slice(&val.to_le_bytes());
             }
             let st2 = 8 * val_slice1.len();
-            #[cfg(feature = "buf_debug")]
-            for i in 0..val_slice2.len() {
+            for (i, val) in val_slice2.iter().enumerate() {
                 let dest = &mut buf[(st2 + i * 8)..(st2 + (i + 1) * 8)];
-                let val = &val_slice2[i];
-                dest.copy_from_slice(&val.to_le_bytes());
-            }
-            #[cfg(not(feature = "buf_debug"))]
-            for i in 0..val_slice2.len() {
-                let dest =
-                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(st2 + i * 8), 8) };
-                let val = unsafe { &*val_slice2.as_ptr().add(i) };
                 dest.copy_from_slice(&val.to_le_bytes());
             }
             self.write_all(buf.as_slice())
