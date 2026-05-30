@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Conducted a comprehensive code review and generated a report (`docs/reviews/2026-05-30_code_review.1.md`).
 
 ### Fixed
+* Compilation error when multiple overflow removal features are enabled (e.g., via `--all-features`) by prioritizing `buf_overf_rem_half` over `buf_overf_rem_all`.
 * Typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
 * `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
 * `clippy::let_and_return` warning.
