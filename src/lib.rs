@@ -208,6 +208,26 @@ pub trait SmallRead {
     /// Read small size bytes with a fast routine. The small size is less than chunk size.
     fn read_exact_small(&mut self, buf: &mut [u8]) -> Result<()>;
     /// Read small size bytes and return MaybeSlice.
+    ///
+    /// # Zero-Copy
+    /// This method attempts to return a zero-copy slice (`MaybeSlice::Slice`) 
+    /// if the requested data resides entirely within a single cached chunk.
+    /// If the data spans across multiple chunks, it will perform a copy 
+    /// and return `MaybeSlice::Buffer`.
+    /// 
+    /// # Example
+    /// ```rust
+    /// match bf.read_exact_maybeslice(size)? {
+    ///     MaybeSlice::Slice(s) => {
+    ///         // Zero-copy! Directly using a reference to the existing buffer.
+    ///         // process(s);
+    ///     }
+    ///     MaybeSlice::Buffer(v) => {
+    ///         // A copy was performed.
+    ///         // process(&v);
+    ///     }
+    /// }
+    /// ```
     fn read_exact_maybeslice(&mut self, size: usize) -> Result<MaybeSlice<'_>>;
 }
 
