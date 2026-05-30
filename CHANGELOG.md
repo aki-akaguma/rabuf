@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor unsafe mutable slice creation in write methods to safe mutable slicing.
 * Refactor unsafe pointer dereferencing in binary search to safe indexing.
 * Refactor unsafe slice creation in `read_u16_le`, `read_u32_le`, and `read_u64_le` to safe slicing.
+* Refactor unsafe pointer arithmetic in byte-by-byte read loop to safe indexing.
 
 ## [0.2.0] (2025-09-25)
 ### Added

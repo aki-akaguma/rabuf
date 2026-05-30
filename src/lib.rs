@@ -331,10 +331,7 @@ impl SmallRead for BufFile {
                     let mut val = 0u64;
                     let mut i = size as i32 - 1;
                     while i >= 0 {
-                        #[cfg(feature = "buf_debug")]
                         let byte = data_slice[i as usize];
-                        #[cfg(not(feature = "buf_debug"))]
-                        let byte = unsafe { *data_slice.as_ptr().add(i as usize) };
                         //
                         val = (val << 8) | byte as u64;
                         i -= 1;
