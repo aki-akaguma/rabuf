@@ -748,9 +748,7 @@ impl Chunk {
                 &mut data[0..end_off]
             };
             //
-            if let Err(err) = file.read_exact(buf) {
-                return Err(err);
-            }
+            file.read_exact(buf)?;
         }
         Ok(Chunk {
             data,
@@ -782,9 +780,7 @@ impl Chunk {
                 &mut self.data[0..end_off]
             };
             //
-            if let Err(err) = file.read_exact(buf) {
-                return Err(err);
-            }
+            file.read_exact(buf)?;
         }
         //
         self.dirty = false;
@@ -810,15 +806,9 @@ impl Chunk {
             &self.data[0..end_off]
         };
         //
-        match file.write_all(buf) {
-            Ok(()) => {
-                self.dirty = false;
-                Ok(())
-            }
-            Err(err) => {
-                Err(err)
-            }
-        }
+        file.write_all(buf)?;
+        self.dirty = false;
+        Ok(())
     }
 }
 
