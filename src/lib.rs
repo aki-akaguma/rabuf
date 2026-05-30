@@ -114,18 +114,19 @@ impl FileSetLen for BufFile {
         if self.end >= size {
             // shrink chunks
             for chunk in self.chunks.iter_mut() {
-                //
-                if chunk.offset + chunk.data.len() as u64 >= size {
-                    // data end is over the new end
-                    // nothing todo
-                } else if chunk.offset >= size {
+                if chunk.offset >= size {
                     // chunk start is over the new end
                     self.map.remove(&chunk.offset);
                     self.fetch_cache = None;
+                    chunk.dirty = false;
                     #[cfg(not(feature = "buf_overf_rem_all"))]
                     {
                         chunk.uses = 0;
                     }
+                } else if chunk.offset + chunk.data.len() as u64 > size {
+                    // data end is over the new end
+                    let keep_len = (size - chunk.offset) as usize;
+                    chunk.data[keep_len..].fill(0u8);
                 }
             }
         }
