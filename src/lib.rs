@@ -1459,20 +1459,12 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
             let data_slice = if ed > chunk.data.len() {
                 &chunk.data[st..]
             } else {
-                #[cfg(feature = "buf_debug")]
-                let data_slice = &chunk.data[st..ed];
-                #[cfg(not(feature = "buf_debug"))]
-                let data_slice =
-                    unsafe { std::slice::from_raw_parts(chunk.data.as_ptr().add(st), ed - st) };
-                data_slice
+                &chunk.data[st..ed]
             };
             //
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
-                #[cfg(feature = "buf_debug")]
-                let slice = &data_slice[..buf_len];
-                #[cfg(not(feature = "buf_debug"))]
-                let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), buf_len) };
+                let slice = &data_slice[0..buf_len];
                 //
                 buf.copy_from_slice(slice);
                 buf_len
@@ -1480,8 +1472,7 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let nallow_buf = &mut buf[..data_slice_len];
                 #[cfg(not(feature = "buf_debug"))]
-                let nallow_buf =
-                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr(), data_slice_len) };
+                let nallow_buf = &mut buf[0..data_slice_len];
                 //
                 nallow_buf.copy_from_slice(data_slice);
                 data_slice_len
