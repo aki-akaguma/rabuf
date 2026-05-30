@@ -112,9 +112,8 @@ impl FileSetLen for BufFile {
     /// ref. [`std::io::File.set_len()`](https://doc.rust-lang.org/std/fs/struct.File.html#method.set_len)
     fn set_len(&mut self, size: u64) -> Result<()> {
         if self.end >= size {
-            // shrink bunks
-            for i in 0..self.chunks.len() {
-                let chunk = &self.chunks[i];
+            // shrink chunks
+            for chunk in self.chunks.iter_mut() {
                 //
                 if chunk.offset + chunk.data.len() as u64 >= size {
                     // data end is over the new end
@@ -125,7 +124,7 @@ impl FileSetLen for BufFile {
                     self.fetch_cache = None;
                     #[cfg(not(feature = "buf_overf_rem_all"))]
                     {
-                        self.chunks[i].uses = 0;
+                        chunk.uses = 0;
                     }
                 }
             }
