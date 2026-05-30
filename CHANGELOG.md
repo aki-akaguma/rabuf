@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `clippy::needless_range_loop` warning (fixed by using `enumerate()`).
 
 ### Changed
+* Refactor `set_len` to correctly handle chunk truncation, fix cache consistency issues, and zero-out stale data in partially truncated chunks.
 * Refactor error handling to use the idiomatic `?` operator based on Clippy suggestions.
 * Refactor to remove unnecessary `PhantomData` placeholders, commented-out dead code, and trailing `//--` comments for better maintainability.
 * Optimize `Chunk::read_inplace` to skip unnecessary 0-filling when the entire chunk is read.
