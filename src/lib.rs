@@ -567,13 +567,10 @@ impl SmallWrite for BufFile {
             }
         }
         {
-            let mut buf = vec![0u8; size];
-            for i in 0..val_slice.len() {
-                let dest = &mut buf[i * 8..(i + 1) * 8];
-                let val = &val_slice[i];
-                dest.copy_from_slice(&val.to_le_bytes());
+            for val in val_slice {
+                self.write_u64_le(*val)?;
             }
-            self.write_all(buf.as_slice())
+            Ok(())
         }
     }
     #[inline]
@@ -602,17 +599,13 @@ impl SmallWrite for BufFile {
             }
         }
         {
-            let mut buf = vec![0u8; size];
-            for (i, val) in val_slice1.iter().enumerate() {
-                let dest = &mut buf[i * 8..(i + 1) * 8];
-                dest.copy_from_slice(&val.to_le_bytes());
+            for val in val_slice1 {
+                self.write_u64_le(*val)?;
             }
-            let st2 = 8 * val_slice1.len();
-            for (i, val) in val_slice2.iter().enumerate() {
-                let dest = &mut buf[(st2 + i * 8)..(st2 + (i + 1) * 8)];
-                dest.copy_from_slice(&val.to_le_bytes());
+            for val in val_slice2 {
+                self.write_u64_le(*val)?;
             }
-            self.write_all(buf.as_slice())
+            Ok(())
         }
     }
     #[inline]

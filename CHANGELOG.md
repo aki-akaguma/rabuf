@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `clippy::needless_range_loop` warning (fixed by using `enumerate()`).
 
 ### Changed
+* Refactor `write_u64_le_slice` and `write_u64_le_slice2` to avoid redundant memory allocations by writing data directly to the chunks.
 * Refactor `roundup_powerof2` to use the idiomatic `u32::next_power_of_two()` and use `u32::is_power_of_two()` for assertions.
 * Refactor internal method names (e.g., `read_exact_maybeslice_vec_inner` to `read_exact_maybeslice_inner`) for better consistency and to remove implementation details from the names.
 * Refactor `set_len` to correctly handle chunk truncation, fix cache consistency issues, and zero-out stale data in partially truncated chunks.
