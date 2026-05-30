@@ -173,7 +173,7 @@ impl Seek for BufFile {
     }
 }
 
-/// File syncronization include OS-internal metadata to disk.
+/// File synchronization include OS-internal metadata to disk.
 pub trait FileSync {
     /// Attempts to sync all OS-internal metadata to disk.
     fn sync_all(&mut self) -> Result<()>;
