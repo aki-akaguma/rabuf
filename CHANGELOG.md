@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+* Conducted a comprehensive code review and generated a second report (`docs/reviews/2026-05-30_code_review.2.md`) identifying critical feature-flag compatibility bugs.
 * Conducted a comprehensive code review and generated a report (`docs/reviews/2026-05-30_code_review.1.md`).
 
 ### Fixed
