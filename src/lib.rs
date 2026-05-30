@@ -987,8 +987,7 @@ impl Hasher for MyHasher {
             a = a ^ (a >> 27);
             self.0 = a;
         } else {
-            for i in 0..bytes.len() {
-                let a = unsafe { *bytes.get_unchecked(i) };
+            for &a in bytes {
                 self.0 = self.0.wrapping_add(a as u64);
             }
         }

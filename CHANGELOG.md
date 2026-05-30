@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fix typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
 * Fix `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
 * Fix `clippy::let_and_return` warning.
+* Fix `clippy::needless_range_loop` warning.
 
 ### Changed
 * Refactor `set_len` to use safe indexing and remove unnecessary `unsafe` blocks.
 * Refactor all chunk access in `flush` and other methods to use safe indexing instead of `unsafe` pointer arithmetic.
 * Refactor unsafe pointer arithmetic in `read_u8` to safe slice indexing.
+* Refactor `unsafe { get_unchecked(...) }` to safe indexing.
 
 ## [0.2.0] (2025-09-25)
 ### Added
