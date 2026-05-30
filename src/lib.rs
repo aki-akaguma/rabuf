@@ -1014,10 +1014,7 @@ impl OffsetIndex {
         {
             let slice = &self.vec;
             if let Ok(x) = slice.binary_search_by(|a| a.0.cmp(offset)) {
-                #[cfg(feature = "buf_debug")]
                 let val = self.vec[x].1;
-                #[cfg(not(feature = "buf_debug"))]
-                let val = unsafe { (*(slice.as_ptr().add(x))).1 };
                 //
                 Some(val)
             } else {
