@@ -385,10 +385,7 @@ impl SmallRead for BufFile {
             if let Some((offset, idx)) = self.fetch_cache {
                 let st = (curr - offset) as usize;
                 //
-                #[cfg(feature = "buf_debug")]
                 let data_len = self.chunks[idx].data.len();
-                #[cfg(not(feature = "buf_debug"))]
-                let data_len = unsafe { (*self.chunks.as_ptr().add(idx)).data.len() };
                 //
                 (idx, st, data_len - st)
             } else {

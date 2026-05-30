@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor unsafe pointer arithmetic in byte-by-byte read loop to safe indexing.
 * Refactor unsafe slice creation in `read_exact_small` to safe slicing.
 * Refactor unsafe pointer operations in `write_u64_le_slice` and `write_u64_le_slice2` to safe idiomatic Rust.
+* Refactor unsafe pointer-based chunk data length access to safe indexing.
 
 ## [0.2.0] (2025-09-25)
 ### Added
