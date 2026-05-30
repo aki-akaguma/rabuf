@@ -398,15 +398,7 @@ impl SmallRead for BufFile {
         if size <= data_sz {
             self.pos += size as u64;
             //
-            #[cfg(feature = "buf_debug")]
             let slice = &self.chunks[idx].data[st..(st + size)];
-            #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe {
-                std::slice::from_raw_parts(
-                    (*(self.chunks.as_ptr().add(idx))).data.as_ptr().add(st),
-                    size,
-                )
-            };
             //
             return Ok(MaybeSlice::Slice(slice));
         }
