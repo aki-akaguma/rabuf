@@ -236,12 +236,7 @@ impl SmallRead for BufFile {
         let curr = self.pos;
         let chunk = self.fetch_chunk(curr)?;
         let st = (curr - chunk.offset) as usize;
-        #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
-        #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe {
-            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
-        };
         //
         if data_slice.len() >= SIZE {
             let slice = &data_slice[0..SIZE];
@@ -266,12 +261,7 @@ impl SmallRead for BufFile {
         let curr = self.pos;
         let chunk = self.fetch_chunk(curr)?;
         let st = (curr - chunk.offset) as usize;
-        #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
-        #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe {
-            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
-        };
         //
         if data_slice.len() >= SIZE {
             let slice = &data_slice[0..SIZE];
@@ -296,12 +286,7 @@ impl SmallRead for BufFile {
         let curr = self.pos;
         let chunk = self.fetch_chunk(curr)?;
         let st = (curr - chunk.offset) as usize;
-        #[cfg(feature = "buf_debug")]
         let data_slice = &chunk.data[st..];
-        #[cfg(not(feature = "buf_debug"))]
-        let data_slice = unsafe {
-            std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
-        };
         //
         if data_slice.len() >= SIZE {
             let slice = &data_slice[0..SIZE];
