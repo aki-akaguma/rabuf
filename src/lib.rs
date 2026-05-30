@@ -719,7 +719,7 @@ struct Chunk {
     /// dirty flag. we should write the chunk to the file.
     dirty: bool,
     /// uses counter. counts up if we read or write chunk.
-    #[cfg(not(feature = "buf_overf_rem_all"))]
+    #[cfg(any(not(feature = "buf_overf_rem_all"), feature = "buf_overf_rem_half"))]
     uses: u32,
 }
 
@@ -735,7 +735,7 @@ impl Chunk {
                 data: vec![0u8; chunk_size],
                 offset,
                 dirty: false,
-                #[cfg(not(feature = "buf_overf_rem_all"))]
+                #[cfg(any(not(feature = "buf_overf_rem_all"), feature = "buf_overf_rem_half"))]
                 uses: 0,
             });
         }
@@ -755,7 +755,7 @@ impl Chunk {
             data,
             offset,
             dirty: false,
-            #[cfg(not(feature = "buf_overf_rem_all"))]
+            #[cfg(any(not(feature = "buf_overf_rem_all"), feature = "buf_overf_rem_half"))]
             uses: 0,
         })
     }
@@ -1317,7 +1317,11 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         }
     }
     //
-    #[cfg(all(feature = "buf_overf_rem", feature = "buf_overf_rem_all"))]
+    #[cfg(all(
+        feature = "buf_overf_rem",
+        feature = "buf_overf_rem_all",
+        not(feature = "buf_overf_rem_half")
+    ))]
     fn remove_chunks(&mut self) -> Result<()> {
         self.clear()?;
         #[cfg(feature = "buf_auto_buf_size")]
