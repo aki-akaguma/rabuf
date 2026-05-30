@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
 * `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
 * `clippy::let_and_return` warning.
-* `clippy::needless_range_loop` warning.
+* `clippy::needless_range_loop` warning (fixed by using `enumerate()`).
 
 ### Changed
 * Optimize `Chunk::read_inplace` to skip unnecessary 0-filling when the entire chunk is read.
