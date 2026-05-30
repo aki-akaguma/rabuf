@@ -1367,7 +1367,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 #[cfg(feature = "buf_debug")]
                 let chunk_mut = &mut self.chunks[idx];
                 #[cfg(not(feature = "buf_debug"))]
-                let chunk_mut = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
+                let chunk_mut = &mut self.chunks[idx];
                 //
                 return Ok(chunk_mut);
             }
@@ -1393,7 +1393,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         #[cfg(feature = "buf_debug")]
         let chunk_mut = &mut self.chunks[idx];
         #[cfg(not(feature = "buf_debug"))]
-        let chunk_mut = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
+        let chunk_mut = &mut self.chunks[idx];
         //
         Ok(chunk_mut)
     }
@@ -1646,10 +1646,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
             for off in off_vec.iter() {
                 let idx = self.map.map[off];
                 //
-                #[cfg(feature = "buf_debug")]
                 let chunk = &mut self.chunks[idx];
-                #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
                 //
                 chunk.write(self.end, &mut self.file)?;
             }
@@ -1657,10 +1654,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
         #[cfg(not(feature = "buf_hash_turbo"))]
         {
             for &(_, idx) in self.map.vec.iter() {
-                #[cfg(feature = "buf_debug")]
                 let chunk = &mut self.chunks[idx];
-                #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { &mut *self.chunks.as_mut_ptr().add(idx) };
                 //
                 chunk.write(self.end, &mut self.file)?;
             }
