@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor all chunk access in `flush` and other methods to use safe indexing instead of `unsafe` pointer arithmetic.
 * Refactor unsafe pointer arithmetic in `read_u8` to safe slice indexing.
 * Refactor `unsafe { get_unchecked(...) }` to safe indexing.
+* Refactor unsafe slice creation in `read_u16`, `read_u32`, and `read_u64` to safe slicing.
 
 ## [0.2.0] (2025-09-25)
 ### Added

@@ -244,10 +244,7 @@ impl SmallRead for BufFile {
         };
         //
         if data_slice.len() >= SIZE {
-            #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
-            #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
@@ -277,10 +274,7 @@ impl SmallRead for BufFile {
         };
         //
         if data_slice.len() >= SIZE {
-            #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
-            #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
@@ -310,10 +304,7 @@ impl SmallRead for BufFile {
         };
         //
         if data_slice.len() >= SIZE {
-            #[cfg(feature = "buf_debug")]
             let slice = &data_slice[0..SIZE];
-            #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { std::slice::from_raw_parts(data_slice.as_ptr(), SIZE) };
             //
             let val = {
                 let mut ary = [0u8; SIZE];
