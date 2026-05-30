@@ -417,7 +417,7 @@ impl SmallRead for BufFile {
             //
             return Ok(MaybeSlice::Slice(slice));
         }
-        self.read_exact_maybeslice_vec_inner(size)
+        self.read_exact_maybeslice_inner(size)
     }
 }
 
@@ -1366,7 +1366,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     }
     //
     #[inline(never)]
-    fn read_exact_maybeslice_vec_inner(&mut self, size: usize) -> Result<MaybeSlice<'_>> {
+    fn read_exact_maybeslice_inner(&mut self, size: usize) -> Result<MaybeSlice<'_>> {
         let mut buf = vec![0u8; size];
         self.read_exact(&mut buf)?;
         Ok(MaybeSlice::Buffer(buf))
