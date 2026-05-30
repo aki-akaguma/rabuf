@@ -69,7 +69,7 @@ use std::fs::File;
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 
 #[cfg(feature = "buf_hash_turbo")]
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeSet};
 
 #[cfg(feature = "buf_myhash")]
 use std::hash::BuildHasherDefault;
@@ -957,6 +957,8 @@ pub struct RaBuf<T: Seek + Read + Write> {
     //
     fetch_cache: Option<(u64, usize)>,
     //
+    frequency_map: BTreeSet<(u32, usize)>,
+    //
     #[cfg(feature = "buf_lru")]
     uses_cnt: u32,
     //
@@ -1033,6 +1035,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             pos: 0,
             end,
             fetch_cache: None,
+            frequency_map: BTreeSet::new(),
             #[cfg(feature = "buf_lru")]
             uses_cnt: 0,
             #[cfg(feature = "buf_stats")]
@@ -1077,6 +1080,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
             pos: 0,
             end,
             fetch_cache: None,
+            frequency_map: BTreeSet::new(),
             #[cfg(feature = "buf_lru")]
             uses_cnt: 0,
             #[cfg(feature = "buf_stats")]
@@ -1097,6 +1101,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     pub fn clear(&mut self) -> Result<()> {
         self.flush()?;
         self.fetch_cache = None;
+        self.frequency_map.clear();
         #[cfg(not(feature = "buf_pin_zero"))]
         {
             self.chunks.clear();
@@ -1174,6 +1179,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         }
         #[cfg(not(feature = "buf_overf_rem"))]
         {
+            let old_uses = self.chunks[_chunk_idx].uses;
             #[cfg(not(feature = "buf_lru"))]
             {
                 self.chunks[_chunk_idx].uses += 1;
@@ -1183,6 +1189,9 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 self.uses_cnt += 1;
                 self.chunks[_chunk_idx].uses = self.uses_cnt;
             }
+            let new_uses = self.chunks[_chunk_idx].uses;
+            self.frequency_map.remove(&(old_uses, _chunk_idx));
+            self.frequency_map.insert((new_uses, _chunk_idx));
         }
     }
     //
@@ -1243,6 +1252,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 Ok(x) => {
                     self.map.insert(&offset, new_idx);
                     self.chunks.push(x);
+                    self.frequency_map.insert((0, new_idx));
                     Ok(new_idx)
                 }
                 Err(e) => Err(e),
