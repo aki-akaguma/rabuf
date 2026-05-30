@@ -463,12 +463,7 @@ impl SmallWrite for BufFile {
             if st + SIZE <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
-                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -494,12 +489,7 @@ impl SmallWrite for BufFile {
             if st + SIZE <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
-                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -525,12 +515,7 @@ impl SmallWrite for BufFile {
             if st + SIZE <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
-                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
@@ -556,12 +541,7 @@ impl SmallWrite for BufFile {
             if st + SIZE <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + SIZE)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), SIZE)
-                };
                 //
                 dest.copy_from_slice(&val.to_le_bytes());
                 self.pos += SIZE as u64;
