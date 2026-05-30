@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor unsafe pointer operations in write methods to safe idiomatic Rust.
 * Refactor unsafe slice creation in `read_exact_maybeslice` to safe slicing.
 * Refactor unsafe pointer operations in `read_exact_maybeslice` to safe idiomatic Rust.
+* Refactor unsafe integer parsing in `read_max_8_bytes` to safe `from_le_bytes` conversion.
 
 ## [0.2.0] (2025-09-25)
 ### Added

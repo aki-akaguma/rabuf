@@ -297,10 +297,11 @@ impl SmallRead for BufFile {
                 u64::from_le_bytes(ary)
             };
             /*<CHECK>
-            let val: u64 = unsafe {
-                *std::mem::transmute::<*const u8, *const u64>(data_slice.as_ptr())
+            let val = {
+                let mut ary = [0u8; 8];
+                ary.copy_from_slice(&data_slice[0..8]);
+                u64::from_le_bytes(ary)
             };
-            let val = u64::from_le(val);
             */
             //
             self.pos += SIZE as u64;
