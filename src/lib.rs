@@ -991,15 +991,12 @@ pub struct RaBuf<T: Seek + Read + Write> {
 
 /// Round up power of 2.
 #[inline]
-pub fn roundup_powerof2(mut v: u32) -> u32 {
-    v -= 1;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v += 1;
-    v
+pub fn roundup_powerof2(v: u32) -> u32 {
+    if v == 0 {
+        0
+    } else {
+        v.next_power_of_two()
+    }
 }
 
 // public implements
@@ -1024,7 +1021,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         chunk_size: u32,
         max_num_chunks: u16,
     ) -> Result<RaBuf<T>> {
-        debug_assert!(chunk_size == roundup_powerof2(chunk_size));
+        debug_assert!(chunk_size.is_power_of_two());
         debug_assert!(max_num_chunks > 0);
         let max_num_chunks = max_num_chunks as usize;
         let chunk_mask = !(chunk_size as u64 - 1);
@@ -1068,7 +1065,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         chunk_size: u32,
         per_mille: u16,
     ) -> Result<RaBuf<T>> {
-        debug_assert!(chunk_size == roundup_powerof2(chunk_size));
+        debug_assert!(chunk_size.is_power_of_two());
         let chunk_mask = !(chunk_size as u64 - 1);
         let chunk_size = chunk_size as usize;
         let auto_buf_size = AutoBufferSize::with_per_mille(per_mille);
