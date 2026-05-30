@@ -327,13 +327,6 @@ impl SmallRead for BufFile {
                 ary.copy_from_slice(slice);
                 u64::from_le_bytes(ary)
             };
-            /*<CHECK>
-            let val = {
-                let mut ary = [0u8; 8];
-                ary.copy_from_slice(&data_slice[0..8]);
-                u64::from_le_bytes(ary)
-            };
-            */
             //
             self.pos += SIZE as u64;
             Ok(val)
@@ -756,7 +749,6 @@ impl Chunk {
             };
             //
             if let Err(err) = file.read_exact(buf) {
-                let _ = std::marker::PhantomData::<i32>;
                 return Err(err);
             }
         }
@@ -791,7 +783,6 @@ impl Chunk {
             };
             //
             if let Err(err) = file.read_exact(buf) {
-                let _ = std::marker::PhantomData::<i32>;
                 return Err(err);
             }
         }
@@ -825,7 +816,6 @@ impl Chunk {
                 Ok(())
             }
             Err(err) => {
-                let _ = std::marker::PhantomData::<i32>;
                 Err(err)
             }
         }
@@ -1508,5 +1498,3 @@ impl<T: Seek + Read + Write> Drop for RaBuf<T> {
         }
     }
 }
-
-//--
