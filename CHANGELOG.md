@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `clippy::needless_range_loop` warning.
 
 ### Changed
+* Optimize `Chunk::read_inplace` to skip unnecessary 0-filling when the entire chunk is read.
 * Improve documentation for `read_exact_maybeslice` to highlight zero-copy usage.
 * Move size check tests to `examples/check_size.rs` and add `make check-size` target.
 * Rename internal helper methods to use the `_inner` suffix for better adherence to Rust naming conventions.

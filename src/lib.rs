@@ -839,7 +839,9 @@ impl Chunk {
         let chunk_size = self.data.len();
         //
         file.seek(SeekFrom::Start(offset))?;
-        self.data.fill(0u8);
+        if offset + chunk_size as u64 > end_pos {
+            self.data.fill(0u8);
+        }
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
             #[cfg(feature = "buf_debug")]
