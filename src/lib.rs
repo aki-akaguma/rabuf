@@ -1493,15 +1493,7 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
             chunk.dirty = true;
             let buf_len = buf.len();
             let st = (curr - chunk.offset) as usize;
-            #[cfg(feature = "buf_debug")]
             let data_slice = &mut chunk.data[st..];
-            #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe {
-                std::slice::from_raw_parts_mut(
-                    chunk.data.as_mut_ptr().add(st),
-                    chunk.data.len() - st,
-                )
-            };
             //
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
