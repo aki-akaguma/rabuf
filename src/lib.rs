@@ -210,11 +210,11 @@ pub trait SmallRead {
     /// Read small size bytes and return MaybeSlice.
     ///
     /// # Zero-Copy
-    /// This method attempts to return a zero-copy slice (`MaybeSlice::Slice`) 
+    /// This method attempts to return a zero-copy slice (`MaybeSlice::Slice`)
     /// if the requested data resides entirely within a single cached chunk.
-    /// If the data spans across multiple chunks, it will perform a copy 
+    /// If the data spans across multiple chunks, it will perform a copy
     /// and return `MaybeSlice::Buffer`.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use rabuf::{BufFile, MaybeSlice, SmallRead};
@@ -351,12 +351,7 @@ impl SmallRead for BufFile {
         let max_8_bytes = {
             let chunk = self.fetch_chunk(curr)?;
             let st = (curr - chunk.offset) as usize;
-            #[cfg(feature = "buf_debug")]
             let data_slice = &chunk.data[st..];
-            #[cfg(not(feature = "buf_debug"))]
-            let data_slice = unsafe {
-                std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
-            };
             //
             if data_slice.len() >= 8 {
                 let val = {
@@ -395,10 +390,7 @@ impl SmallRead for BufFile {
         let buf_len = buf.len();
         let st = (curr - chunk.offset) as usize;
         if st + buf_len <= chunk.data.len() {
-            #[cfg(feature = "buf_debug")]
             let slice = &chunk.data[st..(st + buf_len)];
-            #[cfg(not(feature = "buf_debug"))]
-            let slice = unsafe { std::slice::from_raw_parts(chunk.data.as_ptr().add(st), buf_len) };
             //
             buf.copy_from_slice(slice);
             self.pos += buf_len as u64;
@@ -582,17 +574,9 @@ impl SmallWrite for BufFile {
         }
         {
             let mut buf = vec![0u8; size];
-            #[cfg(feature = "buf_debug")]
             for i in 0..val_slice.len() {
                 let dest = &mut buf[i * 8..(i + 1) * 8];
                 let val = &val_slice[i];
-                dest.copy_from_slice(&val.to_le_bytes());
-            }
-            #[cfg(not(feature = "buf_debug"))]
-            for i in 0..val_slice.len() {
-                let dest =
-                    unsafe { std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(i * 8), 8) };
-                let val = unsafe { &*val_slice.as_ptr().add(i) };
                 dest.copy_from_slice(&val.to_le_bytes());
             }
             self.write_all(buf.as_slice())
@@ -607,33 +591,13 @@ impl SmallWrite for BufFile {
             let st = (curr - chunk.offset) as usize;
             if st + size <= chunk.data.len() {
                 chunk.dirty = true;
-                #[cfg(feature = "buf_debug")]
-                for i in 0..val_slice1.len() {
+                for (i, val) in val_slice1.iter().enumerate() {
                     let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
-                    let val = &val_slice1[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                for i in 0..val_slice1.len() {
-                    let dest = unsafe {
-                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st + i * 8), 8)
-                    };
-                    let val = unsafe { &*val_slice1.as_ptr().add(i) };
                     dest.copy_from_slice(&val.to_le_bytes());
                 }
                 let st2 = st + 8 * val_slice1.len();
-                #[cfg(feature = "buf_debug")]
-                for i in 0..val_slice2.len() {
+                for (i, val) in val_slice2.iter().enumerate() {
                     let dest = &mut chunk.data[(st2 + i * 8)..(st2 + (i + 1) * 8)];
-                    let val = &val_slice2[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                for i in 0..val_slice2.len() {
-                    let dest = unsafe {
-                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st2 + i * 8), 8)
-                    };
-                    let val = unsafe { &*val_slice2.as_ptr().add(i) };
                     dest.copy_from_slice(&val.to_le_bytes());
                 }
                 self.pos += size as u64;
@@ -673,13 +637,7 @@ impl SmallWrite for BufFile {
             if st + buf_len <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + buf_len)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), buf_len)
-                };
-                //
                 dest.copy_from_slice(buf);
                 //
                 self.pos += buf_len as u64;
@@ -701,13 +659,7 @@ impl SmallWrite for BufFile {
             if st + size <= chunk.data.len() {
                 chunk.dirty = true;
                 //
-                #[cfg(feature = "buf_debug")]
                 let dest = &mut chunk.data[st..(st + size)];
-                #[cfg(not(feature = "buf_debug"))]
-                let dest = unsafe {
-                    std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st), size)
-                };
-                //
                 //dest.fill(0u8);
                 for item in dest.iter_mut() {
                     *item = 0u8;
@@ -797,22 +749,10 @@ impl Chunk {
         let mut data = vec![0u8; chunk_size];
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
-            #[cfg(feature = "buf_debug")]
             let buf = if chunk_size <= end_off {
                 &mut data[0..]
             } else {
                 &mut data[0..end_off]
-            };
-            #[cfg(not(feature = "buf_debug"))]
-            let buf = unsafe {
-                std::slice::from_raw_parts_mut(
-                    data.as_mut_ptr(),
-                    if chunk_size <= end_off {
-                        chunk_size
-                    } else {
-                        end_off
-                    },
-                )
             };
             //
             if let Err(err) = file.read_exact(buf) {
@@ -844,22 +784,10 @@ impl Chunk {
         }
         if offset != end_pos {
             let end_off = (end_pos - offset) as usize;
-            #[cfg(feature = "buf_debug")]
             let buf = if chunk_size <= end_off {
                 &mut self.data[0..]
             } else {
                 &mut self.data[0..end_off]
-            };
-            #[cfg(not(feature = "buf_debug"))]
-            let buf = unsafe {
-                std::slice::from_raw_parts_mut(
-                    self.data.as_mut_ptr(),
-                    if chunk_size <= end_off {
-                        chunk_size
-                    } else {
-                        end_off
-                    },
-                )
             };
             //
             if let Err(err) = file.read_exact(buf) {
@@ -885,22 +813,10 @@ impl Chunk {
         file.seek(SeekFrom::Start(self.offset))?;
         let end_off = (end_pos - self.offset) as usize;
         let chunk_size = self.data.len();
-        #[cfg(feature = "buf_debug")]
         let buf = if chunk_size <= end_off {
             &self.data[0..]
         } else {
             &self.data[0..end_off]
-        };
-        #[cfg(not(feature = "buf_debug"))]
-        let buf = unsafe {
-            std::slice::from_raw_parts(
-                self.data.as_ptr(),
-                if chunk_size <= end_off {
-                    chunk_size
-                } else {
-                    end_off
-                },
-            )
         };
         //
         match file.write_all(buf) {
