@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 * Fix typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
 * Fix `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
+* Fix `clippy::let_and_return` warning.
 
 ### Changed
 * Refactor `set_len` to use safe indexing and remove unnecessary `unsafe` blocks.

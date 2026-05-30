@@ -1547,13 +1547,7 @@ impl<T: Seek + Read + Write> Read for RaBuf<T> {
             let ed = (ed - chunk.offset) as usize;
             //
             let data_slice = if ed > chunk.data.len() {
-                #[cfg(feature = "buf_debug")]
-                let data_slice = &chunk.data[st..];
-                #[cfg(not(feature = "buf_debug"))]
-                let data_slice = unsafe {
-                    std::slice::from_raw_parts(chunk.data.as_ptr().add(st), chunk.data.len() - st)
-                };
-                data_slice
+                &chunk.data[st..]
             } else {
                 #[cfg(feature = "buf_debug")]
                 let data_slice = &chunk.data[st..ed];
