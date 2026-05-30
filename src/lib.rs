@@ -114,10 +114,7 @@ impl FileSetLen for BufFile {
         if self.end >= size {
             // shrink bunks
             for i in 0..self.chunks.len() {
-                #[cfg(feature = "buf_debug")]
                 let chunk = &self.chunks[i];
-                #[cfg(not(feature = "buf_debug"))]
-                let chunk = unsafe { &*self.chunks.as_ptr().add(i) };
                 //
                 if chunk.offset + chunk.data.len() as u64 >= size {
                     // data end is over the new end
