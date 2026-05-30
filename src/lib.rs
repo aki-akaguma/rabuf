@@ -537,18 +537,8 @@ impl SmallWrite for BufFile {
             let st = (curr - chunk.offset) as usize;
             if st + size <= chunk.data.len() {
                 chunk.dirty = true;
-                #[cfg(feature = "buf_debug")]
-                for i in 0..val_slice.len() {
+                for (i, val) in val_slice.iter().enumerate() {
                     let dest = &mut chunk.data[(st + i * 8)..(st + (i + 1) * 8)];
-                    let val = &val_slice[i];
-                    dest.copy_from_slice(&val.to_le_bytes());
-                }
-                #[cfg(not(feature = "buf_debug"))]
-                for i in 0..val_slice.len() {
-                    let dest = unsafe {
-                        std::slice::from_raw_parts_mut(chunk.data.as_mut_ptr().add(st + i * 8), 8)
-                    };
-                    let val = unsafe { &*(val_slice.as_ptr().add(i)) };
                     dest.copy_from_slice(&val.to_le_bytes());
                 }
                 self.pos += size as u64;
