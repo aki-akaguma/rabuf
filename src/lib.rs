@@ -217,14 +217,26 @@ pub trait SmallRead {
     /// 
     /// # Example
     /// ```rust
-    /// match bf.read_exact_maybeslice(size)? {
+    /// use rabuf::{BufFile, MaybeSlice, SmallRead};
+    /// use std::fs::OpenOptions;
+    /// use std::io::{Seek, Write};
+    ///
+    /// std::fs::create_dir_all("target/tmp").unwrap();
+    /// let path = "target/tmp/doctest_maybeslice";
+    /// let f = OpenOptions::new().create(true).read(true).write(true).open(path).unwrap();
+    /// let mut bf = BufFile::new("tes", f).unwrap();
+    /// bf.write_all(b"Hello, world!").unwrap();
+    /// bf.rewind().unwrap();
+    ///
+    /// let size = 5;
+    /// match bf.read_exact_maybeslice(size).unwrap() {
     ///     MaybeSlice::Slice(s) => {
     ///         // Zero-copy! Directly using a reference to the existing buffer.
-    ///         // process(s);
+    ///         assert_eq!(s, b"Hello");
     ///     }
     ///     MaybeSlice::Buffer(v) => {
     ///         // A copy was performed.
-    ///         // process(&v);
+    ///         assert_eq!(v, b"Hello");
     ///     }
     /// }
     /// ```
