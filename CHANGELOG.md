@@ -6,11 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+* Conducted a comprehensive code review and generated a report (`docs/reviews/2026-05-30_code_review.1.md`).
+
 ### Fixed
-* Fix typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
-* Fix `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
-* Fix `clippy::let_and_return` warning.
-* Fix `clippy::needless_range_loop` warning.
+* Typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
+* `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
+* `clippy::let_and_return` warning.
+* `clippy::needless_range_loop` warning.
 
 ### Changed
 * Refactor `set_len` to use safe indexing and remove unnecessary `unsafe` blocks.
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor unsafe integer parsing in `read_max_8_bytes` to safe `from_le_bytes` conversion.
 * Refactor unsafe mutable slice creation in `read_exact_maybeslice` to safe mutable slicing.
 
+
 ## [0.2.0] (2025-09-25)
 ### Added
 * `specs`
@@ -38,11 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * bug: Reading at file sizes below `chunk` size will result in an infinite loop.
-* clippy: clippy::unnecessary_cast
+* `clippy::unnecessary_cast`
 
 ## [0.1.20] (2024-06-09)
 ### Fixed
-* clippy: clippy::suspicious_open_options
+* `clippy::suspicious_open_options`
 
 ## [0.1.19] (2023-02-12)
 ### Added
@@ -68,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * Makefile: rustc version `1.66.0` to `1.66.1`
-* clippy: `seek_to_start_instead_of_rewind`
+* `clippy::seek_to_start_instead_of_rewind`
 * skip `test_size_of()` on windows
 
 ## [0.1.17] (2023-01-10)
@@ -86,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * bug: it can not be compiled at `--no-default-features`.
-* clippy: https://rust-lang.github.io/rust-clippy/master/index.html#seek_to_start_instead_of_rewind
+* `clippy::seek_to_start_instead_of_rewind`
 
 ## [0.1.16] (2023-01-05)
 ### Fixed
