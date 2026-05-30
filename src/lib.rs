@@ -399,7 +399,7 @@ impl SmallRead for BufFile {
             //
             return Ok(MaybeSlice::Slice(slice));
         }
-        self.read_exact_maybeslice_vec_(size)
+        self.read_exact_maybeslice_vec_inner(size)
     }
 }
 
@@ -688,7 +688,7 @@ impl SmallWrite for BufFile {
                 return Ok(());
             }
         }
-        self.write_zero_0_(size)
+        self.write_zero_inner(size)
     }
 }
 
@@ -1279,9 +1279,9 @@ impl<T: Seek + Read + Write> RaBuf<T> {
                 return Ok(chunk_mut);
             }
         }
-        self.fetch_chunk_0_(offset)
+        self.fetch_chunk_inner(offset)
     }
-    fn fetch_chunk_0_(&mut self, offset: u64) -> Result<&mut Chunk> {
+    fn fetch_chunk_inner(&mut self, offset: u64) -> Result<&mut Chunk> {
         let idx = if let Some(x) = self.map.get(&offset) {
             #[cfg(feature = "buf_print_hits")]
             {
@@ -1430,13 +1430,13 @@ impl<T: Seek + Read + Write> RaBuf<T> {
     }
     //
     #[inline(never)]
-    fn read_exact_maybeslice_vec_(&mut self, size: usize) -> Result<MaybeSlice<'_>> {
+    fn read_exact_maybeslice_vec_inner(&mut self, size: usize) -> Result<MaybeSlice<'_>> {
         let mut buf = vec![0u8; size];
         self.read_exact(&mut buf)?;
         Ok(MaybeSlice::Buffer(buf))
     }
     #[inline(never)]
-    fn write_zero_0_(&mut self, size: usize) -> Result<()> {
+    fn write_zero_inner(&mut self, size: usize) -> Result<()> {
         let buf = vec![0u8; size];
         self.write_all(&buf)
     }

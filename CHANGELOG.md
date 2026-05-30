@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `clippy::needless_range_loop` warning.
 
 ### Changed
+* Rename internal helper methods to use the `_inner` suffix for better adherence to Rust naming conventions.
 * Refactor `set_len` to use idiomatic iterators.
 * Refactor `set_len` to use safe indexing and remove unnecessary `unsafe` blocks.
 * Refactor all chunk access in `flush` and other methods to use safe indexing instead of `unsafe` pointer arithmetic.
