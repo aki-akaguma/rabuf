@@ -16,7 +16,7 @@ default = ["buf_auto_buf_size", "buf_overf_rem_all", "buf_pin_zero", "buf_hash_t
 
 buf_auto_buf_size = []
 
-buf_overf_rem_all = ["buf_overf_rem"]
+buf_overf_rem_all = ["buf_overf_rem"] # Note: buf_overf_rem_half takes precedence if both are enabled.
 buf_overf_rem_half = ["buf_overf_rem", "buf_lru"]
 buf_overf_rem = []
 
