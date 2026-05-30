@@ -1504,22 +1504,10 @@ impl<T: Seek + Read + Write> Write for RaBuf<T> {
             //
             let data_slice_len = data_slice.len();
             if buf_len <= data_slice_len {
-                #[cfg(feature = "buf_debug")]
-                let slice = &mut data_slice[..buf_len];
-                #[cfg(not(feature = "buf_debug"))]
-                let slice =
-                    unsafe { std::slice::from_raw_parts_mut(data_slice.as_mut_ptr(), buf_len) };
-                //
-                slice.copy_from_slice(buf);
+                data_slice[..buf_len].copy_from_slice(buf);
                 buf_len
             } else {
-                #[cfg(feature = "buf_debug")]
-                let nallow_buf = &buf[..data_slice_len];
-                #[cfg(not(feature = "buf_debug"))]
-                let nallow_buf =
-                    unsafe { std::slice::from_raw_parts(buf.as_ptr(), data_slice_len) };
-                //
-                data_slice.copy_from_slice(nallow_buf);
+                data_slice.copy_from_slice(&buf[..data_slice_len]);
                 data_slice_len
             }
         };
