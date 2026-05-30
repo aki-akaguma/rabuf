@@ -220,10 +220,7 @@ impl SmallRead for BufFile {
         let chunk = self.fetch_chunk(curr)?;
         let st = (curr - chunk.offset) as usize;
         if st < chunk.data.len() {
-            #[cfg(feature = "buf_debug")]
             let val = chunk.data[st];
-            #[cfg(not(feature = "buf_debug"))]
-            let val = unsafe { *chunk.data.as_ptr().add(st) };
             //
             self.pos += 1;
             Ok(val)
