@@ -149,8 +149,7 @@ impl Seek for BufFile {
                 if x < 0 {
                     self.end - (-x) as u64
                 } else {
-                    // weren't automatically extended beyond the end.
-                    self.end - x as u64
+                    self.end + x as u64
                 }
             }
             SeekFrom::Current(x) => {
