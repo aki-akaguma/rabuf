@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+
+## [0.3.0] (2026-05-31)
 ### Added
 * Conducted a final code review and generated a report (`docs/reviews/2026-05-31_code_review.4.md`) confirming the effectiveness of the optimizations and 100% safe Rust compliance.
 * Conducted a comprehensive code review and generated a second report (`docs/reviews/2026-05-30_code_review.2.md`) identifying critical feature-flag compatibility bugs.
@@ -49,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Refactor unsafe pointer operations in `read_exact_maybeslice` to safe idiomatic Rust.
 * Refactor unsafe integer parsing in `read_max_8_bytes` to safe `from_le_bytes` conversion.
 * Refactor unsafe mutable slice creation in `read_exact_maybeslice` to safe mutable slicing.
-
 
 ## [0.2.0] (2025-09-25)
 ### Added

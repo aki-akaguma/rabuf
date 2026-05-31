@@ -1,6 +1,6 @@
 [package]
 name = "rabuf"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["aki <aki.akaguma@hotmail.com>"]
 edition = "2021"
 description = "randome access buffer for io"
