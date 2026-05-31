@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `clippy::needless_range_loop` warning (fixed by using `enumerate()`).
 
 ### Changed
+* Refactor `buf_stats` to use `vec![]` macro and remove empty doc comments based on Clippy suggestions.
 * Refactor LFU eviction strategy in `add_chunk` from O(N) linear scan to O(log N) using `BTreeSet` for improved performance on large caches.
 * Refactor `write_u64_le_slice` and `write_u64_le_slice2` to avoid redundant memory allocations by writing data directly to the chunks.
 * Refactor `roundup_powerof2` to use the idiomatic `u32::next_power_of_two()` and use `u32::is_power_of_two()` for assertions.

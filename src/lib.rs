@@ -1138,19 +1138,18 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         let _ = self.fetch_chunk(offset)?;
         Ok(())
     }
-    ///
     #[cfg(feature = "buf_stats")]
     pub fn buf_stats(&self) -> Vec<(String, i64)> {
-        let mut vec = Vec::new();
-        vec.push((
-            "BufFile.stats_min_uses".to_string(),
-            self.stats_min_uses as i64,
-        ));
-        vec.push((
-            "BufFile.stats_max_uses".to_string(),
-            self.stats_max_uses as i64,
-        ));
-        vec
+        vec![
+            (
+                "BufFile.stats_min_uses".to_string(),
+                self.stats_min_uses as i64,
+            ),
+            (
+                "BufFile.stats_max_uses".to_string(),
+                self.stats_max_uses as i64,
+            ),
+        ]
     }
 
     /// Helper to get internal struct sizes for manual verification.
@@ -1344,7 +1343,7 @@ impl<T: Seek + Read + Write> RaBuf<T> {
         });
         let half = vec.len() / 2;
         let _rest = vec.split_off(half);
-        vec.sort_by(|a, b| a.0.cmp(&b.0));
+        vec.sort_by_key(|a| a.0);
         while let Some((idx, _uses)) = vec.pop() {
             let mut _chunk = self.chunks.remove(idx);
             _chunk.write(self.end, &mut self.file)?;
