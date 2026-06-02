@@ -2,206 +2,227 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-31
 
-## [0.3.0] (2026-05-31)
 ### Added
-* Conducted a final code review and generated a report (`docs/reviews/2026-05-31_code_review.4.md`) confirming the effectiveness of the optimizations and 100% safe Rust compliance.
-* Conducted a comprehensive code review and generated a second report (`docs/reviews/2026-05-30_code_review.2.md`) identifying critical feature-flag compatibility bugs.
-* Conducted a comprehensive code review and generated a report (`docs/reviews/2026-05-30_code_review.1.md`).
+- Final code review report (`docs/reviews/2026-05-31_code_review.4.md`) confirming optimizations and 100% safe Rust compliance.
+- Comprehensive code review report (`docs/reviews/2026-05-30_code_review.2.md`) identifying critical feature-flag compatibility bugs.
+- Initial comprehensive code review report (`docs/reviews/2026-05-30_code_review.1.md`).
 
 ### Fixed
-* Compilation error when multiple overflow removal features are enabled (e.g., via `--all-features`) by prioritizing `buf_overf_rem_half` over `buf_overf_rem_all`.
-* Typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
-* `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
-* `clippy::let_and_return` warning.
-* `clippy::needless_range_loop` warning (fixed by using `enumerate()`).
+- Compilation error when multiple overflow removal features are enabled (e.g., via `--all-features`) by prioritizing `buf_overf_rem_half` over `buf_overf_rem_all`.
+- Typos in comments ("ramdom" -> "random", "syncronization" -> "synchronization").
+- `SeekFrom::End(x)` implementation for positive `x` to correctly seek past the end of the file.
+- `clippy::let_and_return` warning.
+- `clippy::needless_range_loop` warning by using `enumerate()`.
 
 ### Changed
-* Refactor `buf_stats` to use `vec![]` macro and remove empty doc comments based on Clippy suggestions.
-* Refactor LFU eviction strategy in `add_chunk` from O(N) linear scan to O(log N) using `BTreeSet` for improved performance on large caches.
-* Refactor `write_u64_le_slice` and `write_u64_le_slice2` to avoid redundant memory allocations by writing data directly to the chunks.
-* Refactor `roundup_powerof2` to use the idiomatic `u32::next_power_of_two()` and use `u32::is_power_of_two()` for assertions.
-* Refactor internal method names (e.g., `read_exact_maybeslice_vec_inner` to `read_exact_maybeslice_inner`) for better consistency and to remove implementation details from the names.
-* Refactor `set_len` to correctly handle chunk truncation, fix cache consistency issues, and zero-out stale data in partially truncated chunks.
-* Refactor error handling to use the idiomatic `?` operator based on Clippy suggestions.
-* Refactor to remove unnecessary `PhantomData` placeholders, commented-out dead code, and trailing `//--` comments for better maintainability.
-* Optimize `Chunk::read_inplace` to skip unnecessary 0-filling when the entire chunk is read.
-* Improve documentation for `read_exact_maybeslice` to highlight zero-copy usage.
-* Move size check tests to `examples/check_size.rs` and add `make check-size` target.
-* Rename internal helper methods to use the `_inner` suffix for better adherence to Rust naming conventions.
-* Refactor `set_len` to use idiomatic iterators.
-* Refactor `set_len` to use safe indexing and remove unnecessary `unsafe` blocks.
-* Refactor all chunk access in `flush` and other methods to use safe indexing instead of `unsafe` pointer arithmetic.
-* Refactor unsafe pointer arithmetic in `read_u8` to safe slice indexing.
-* Refactor `unsafe { get_unchecked(...) }` to safe indexing.
-* Refactor unsafe slice creation in `read_u16`, `read_u32`, and `read_u64` to safe slicing.
-* Refactor unsafe mutable slice creation in write methods to safe mutable slicing.
-* Refactor unsafe pointer dereferencing in binary search to safe indexing.
-* Refactor unsafe slice creation in `read_u16_le`, `read_u32_le`, and `read_u64_le` to safe slicing.
-* Refactor unsafe pointer arithmetic in byte-by-byte read loop to safe indexing.
-* Refactor unsafe slice creation in `read_exact_small` to safe slicing.
-* Refactor unsafe pointer operations in `write_u64_le_slice` and `write_u64_le_slice2` to safe idiomatic Rust.
-* Refactor unsafe pointer-based chunk data length access to safe indexing.
-* Refactor unsafe pointer operations in write methods to safe idiomatic Rust.
-* Refactor unsafe slice creation in `read_exact_maybeslice` to safe slicing.
-* Refactor unsafe pointer operations in `read_exact_maybeslice` to safe idiomatic Rust.
-* Refactor unsafe integer parsing in `read_max_8_bytes` to safe `from_le_bytes` conversion.
-* Refactor unsafe mutable slice creation in `read_exact_maybeslice` to safe mutable slicing.
+- Use `vec![]` macro in `buf_stats` and remove empty doc comments based on Clippy suggestions.
+- Update LFU eviction strategy in `add_chunk` from O(N) linear scan to O(log N) using `BTreeSet` for improved performance on large caches.
+- Update `write_u64_le_slice` and `write_u64_le_slice2` to avoid redundant memory allocations by writing data directly to the chunks.
+- Use idiomatic `u32::next_power_of_two()` in `roundup_powerof2` and use `u32::is_power_of_two()` for assertions.
+- Standardize internal method names (e.g., `read_exact_maybeslice_vec_inner` to `read_exact_maybeslice_inner`) for better consistency.
+- Improve `set_len` to correctly handle chunk truncation, fix cache consistency issues, and zero-out stale data in partially truncated chunks.
+- Use idiomatic `?` operator for error handling based on Clippy suggestions.
+- Remove unnecessary `PhantomData` placeholders, commented-out dead code, and trailing `//--` comments for better maintainability.
+- Skip unnecessary 0-filling in `Chunk::read_inplace` when the entire chunk is read.
+- Highlight zero-copy usage in `read_exact_maybeslice` documentation.
+- Move size check tests to `examples/check_size.rs` and add `make check-size` target.
+- Suffix internal helper methods with `_inner` for better adherence to Rust naming conventions.
+- Use idiomatic iterators in `set_len`.
+- Use safe indexing in `set_len` and remove unnecessary `unsafe` blocks.
+- Use safe indexing for all chunk access in `flush` and other methods instead of `unsafe` pointer arithmetic.
+- Use safe slice indexing for `read_u8` instead of unsafe pointer arithmetic.
+- Use safe indexing instead of `unsafe { get_unchecked(...) }`.
+- Use safe slicing for `read_u16`, `read_u32`, and `read_u64` instead of unsafe slice creation.
+- Use safe mutable slicing for write methods instead of unsafe mutable slice creation.
+- Use safe indexing for binary search instead of unsafe pointer dereferencing.
+- Use safe slicing for `read_u16_le`, `read_u32_le`, and `read_u64_le` instead of unsafe slice creation.
+- Use safe indexing for byte-by-byte read loop instead of unsafe pointer arithmetic.
+- Use safe slicing for `read_exact_small` instead of unsafe slice creation.
+- Use safe idiomatic Rust for `write_u64_le_slice` and `write_u64_le_slice2` instead of unsafe pointer operations.
+- Use safe indexing for chunk data length access instead of unsafe pointer-based access.
+- Use safe idiomatic Rust for write methods instead of unsafe pointer operations.
+- Use safe slicing for `read_exact_maybeslice` instead of unsafe slice creation.
+- Use safe idiomatic Rust for `read_exact_maybeslice` instead of unsafe pointer operations.
+- Use safe `from_le_bytes` conversion for `read_max_8_bytes` instead of unsafe integer parsing.
+- Use safe mutable slicing for `read_exact_maybeslice` instead of unsafe mutable slice creation.
 
-## [0.2.0] (2025-09-25)
+## [0.2.0] - 2025-09-25
+
 ### Added
-* `specs`
-* more tests
+- Specifications (`specs` folder).
+- Additional tests.
 
 ### Fixed
-* bug: Reading at file sizes below `chunk` size will result in an infinite loop.
-* `clippy::unnecessary_cast`
+- Infinite loop when reading at file sizes below `chunk` size.
+- `clippy::unnecessary_cast` warning.
 
-## [0.1.20] (2024-06-09)
+## [0.1.20] - 2024-06-09
+
 ### Fixed
-* `clippy::suspicious_open_options`
+- `clippy::suspicious_open_options` warning.
 
-## [0.1.19] (2023-02-12)
+## [0.1.19] - 2023-02-12
+
 ### Added
-* `.github/workflows/test-ubuntu.yml`
-* `.github/workflows/test-macos.yml`
-* `.github/workflows/test-windows.yml`
-* test status badges into `README.tpl`
-* `MIRIFLAGS=-Zmiri-disable-isolation` on `cargo miri`
+- GitHub Action workflows for Ubuntu, macOS, and Windows.
+- Test status badges in `README.tpl`.
+- `MIRIFLAGS=-Zmiri-disable-isolation` for `cargo miri`.
 
 ### Changed
-* refactored `Makefile`
+- Refactored `Makefile`.
 
 ### Removed
-* `COPYING`
+- `COPYING` file.
 
 ### Fixed
-* `LICENSE-APACHE`, `LICENSE-MIT`
+- `LICENSE-APACHE` and `LICENSE-MIT` files.
 
-## [0.1.18] (2023-01-28)
+## [0.1.18] - 2023-01-28
+
 ### Added
-* `.github/workflows/test.yml`
-* test status badges into `README.tpl`
+- GitHub Action workflow for tests.
+- Test status badges in `README.tpl`.
 
 ### Fixed
-* Makefile: rustc version `1.66.0` to `1.66.1`
-* `clippy::seek_to_start_instead_of_rewind`
-* skip `test_size_of()` on windows
+- Update rustc version from `1.66.0` to `1.66.1` in `Makefile`.
+- `clippy::seek_to_start_instead_of_rewind` warning.
+- Skip `test_size_of()` on Windows.
 
-## [0.1.17] (2023-01-10)
+## [0.1.17] - 2023-01-10
+
 ### Added
-* version difference link into `CHANGELOG.md`
-* rust-version = "1.56.0" into Cargo.toml
-* `all-test-version` target into Makefile
-* badges into README.tpl
+- Version difference link into `CHANGELOG.md`.
+- `rust-version = "1.56.0"` into `Cargo.toml`.
+- `all-test-version` target into `Makefile`.
+- Status badges into `README.tpl`.
 
 ### Changed
-* rename target `test-no_std` to `test-no-default-features` on Makefile
+- Rename target `test-no_std` to `test-no-default-features` in `Makefile`.
 
 ### Removed
-* remove bench-all target from Makefile, no used
+- Unused `bench-all` target from `Makefile`.
 
 ### Fixed
-* bug: it can not be compiled at `--no-default-features`.
-* `clippy::seek_to_start_instead_of_rewind`
+- Compilation error when using `--no-default-features`.
+- `clippy::seek_to_start_instead_of_rewind` warning.
 
-## [0.1.16] (2023-01-05)
+## [0.1.16] - 2023-01-05
+
 ### Fixed
-* clippy: this let-binding has unit value
+- `clippy` warning regarding let-binding with unit value.
 
-## [0.1.15] (2022-06-13)
-### Changed
-* changes to edition 2021
-
-## [0.1.14] (2022-02-19)
-### Fixed
-* minimum support rustc `1.48.0`.
-
-## [0.1.13] (2022-02-01)
-### Changed
-* `Vec::get()` has been rewritten by pointer operation in the case of NOT "buf_debug".
-
-## [0.1.12] (2022-01-26)
-### Added
-* add `write_u64_le_slice()` and `write_u64_le_slice2()` to `trait SmallWrite`
-* add `into_vec()` to `enum MaybeSlice`.
-
-## [0.1.11] (2022-01-18)
-### Added
-* add `MyHasher` that has simple xorshift algorithm
-
-## [0.1.10] (2022-01-14)
-### Added
-* add `buf_debug` to features for debugging `rabuf`.
-* add `write_u8()`, `write_u16_le()`, `write_u32_le()` and `write_u64_le()`.
-* add `read_u16_le()`, `read_u32_le()` and `read_u64_le()`.
+## [0.1.15] - 2022-06-13
 
 ### Changed
-* rename `read_one_byte()` to `read_u8()`.
+- Update to Rust 2021 edition.
 
-## [0.1.9] (2022-01-11)
-### Added
-* add `prepare()` method to `RaBuf<T>`.
-* add `buf_auto_buf_size` support into `add_chunk()`, important performance.
-
-## [0.1.8] (2022-01-08)
-### Added
-* add `buf_hash_turbo` to features. Important for Performance.
-
-## [0.1.7] (2022-01-07)
-### Fixed
-* perforamance.
-
-## [0.1.6] (2021-12-19)
-### Added
-* add name to `struct rabuf` for debugging.
-* add `buf_print_hits` to features.
+## [0.1.14] - 2022-02-19
 
 ### Fixed
-* fix some bugs of `setup_auto_buf_size()`.
+- Minimum supported rustc version set to `1.48.0`.
+
+## [0.1.13] - 2022-02-01
+
+### Changed
+- Rewrite `Vec::get()` using pointer operations when `buf_debug` is disabled.
+
+## [0.1.12] - 2022-01-26
+
+### Added
+- `write_u64_le_slice()` and `write_u64_le_slice2()` to `trait SmallWrite`.
+- `into_vec()` to `enum MaybeSlice`.
+
+## [0.1.11] - 2022-01-18
+
+### Added
+- `MyHasher` with a simple xorshift algorithm.
+
+## [0.1.10] - 2022-01-14
+
+### Added
+- `buf_debug` feature for debugging `rabuf`.
+- `write_u8()`, `write_u16_le()`, `write_u32_le()`, and `write_u64_le()`.
+- `read_u16_le()`, `read_u32_le()`, and `read_u64_le()`.
+
+### Changed
+- Rename `read_one_byte()` to `read_u8()`.
+
+## [0.1.9] - 2022-01-11
+
+### Added
+- `prepare()` method to `RaBuf<T>`.
+- `buf_auto_buf_size` support in `add_chunk()` for better performance.
+
+## [0.1.8] - 2022-01-08
+
+### Added
+- `buf_hash_turbo` feature for improved performance.
+
+## [0.1.7] - 2022-01-07
+
+### Fixed
+- Performance improvements.
+
+## [0.1.6] - 2021-12-19
+
+### Added
+- Name field to `struct rabuf` for debugging.
+- `buf_print_hits` feature.
+
+### Fixed
+- Bugs in `setup_auto_buf_size()`.
 
 ### Removed
-* remove `buf_idx_btreemap` from features.
+- `buf_idx_btreemap` feature.
 
+## [0.1.5] - 2021-12-13
 
-## [0.1.5] (2021-12-13)
 ### Added
-* add `read_fill_buffer()`.
+- `read_fill_buffer()`.
 
-## [0.1.4] (2021-12-05)
+## [0.1.4] - 2021-12-05
+
 ### Added
-* add `buf_pin_zero` to features
-* add `buf_auto_buf_size` to features
+- `buf_pin_zero` feature.
+- `buf_auto_buf_size` feature.
 
 ### Fixed
-* bug: create methods of `struct RaBuf<T>`.
+- Creation methods of `struct RaBuf<T>`.
 
-## [0.1.3] (2021-11-26)
+## [0.1.3] - 2021-11-26
+
 ### Added
-* add `buf_overf_rem_all` and `buf_overf_rem_half` to features.
+- `buf_overf_rem_all` and `buf_overf_rem_half` features.
 
 ### Changed
-* rewrite flush() method to be written out in the order of offset.
-* rewrite the remove strategy at the over limit by the half/all remove.
+- Rewrite `flush()` to write out in offset order.
+- Rewrite overflow removal strategy to use half/all removal.
 
-## [0.1.2] (2021-11-17)
+## [0.1.2] - 2021-11-17
+
 ### Added
-* add features: buf_lru, buf_stats
+- `buf_lru` and `buf_stats` features.
 
-## [0.1.1] (2021-11-11)
+## [0.1.1] - 2021-11-11
+
 ### Added
-* add tests
-* add trait and impl: FileSetLen, FileSync, SmallRead, SmallWrite
+- Comprehensive tests.
+- `FileSetLen`, `FileSync`, `SmallRead`, and `SmallWrite` traits and implementations.
 
-## [0.1.0] (2021-11-10)
-* first commit
+## [0.1.0] - 2021-11-10
 
-[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.2.0..HEAD
+### Added
+- Initial release.
+
+[Unreleased]: https://github.com/aki-akaguma/rabuf/compare/v0.3.0..HEAD
+[0.3.0]: https://github.com/aki-akaguma/rabuf/compare/v0.2.0..v0.3.0
 [0.2.0]: https://github.com/aki-akaguma/rabuf/compare/v0.1.20..v0.2.0
 [0.1.20]: https://github.com/aki-akaguma/rabuf/compare/v0.1.19..v0.1.20
 [0.1.19]: https://github.com/aki-akaguma/rabuf/compare/v0.1.18..v0.1.19
